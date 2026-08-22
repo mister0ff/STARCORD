@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StarCord</title>
+    
+    <!-- Mapeamento para permitir as importações do Firebase -->
+    <script type="importmap">
+      {
+        "imports": {
+          "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+          "firebase/analytics": "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js",
+          "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"
+        }
+      }
+    </script>
+
+    <style>
+        :root {
+            --star-red: #ff2a4b;
+            --star-red-hover: #d91c38;
+            --bg-darkest: #0e0e11;
+            --bg-darker: #16161a;
+            --bg-dark: #1e1e24;
+            --bg-light: #2b2b36;
+            --text-main: #f2f2f5;
+            --text-muted: #8e8e9f;
+            --border-color: #2a2a35;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-darkest);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* ----- TELA DE LOGIN / CADASTRO ----- */
+        #auth-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-darkest);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .auth-card {
+            background: var(--bg-darker);
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .auth-card h1 {
+            color: var(--star-red);
+            margin-bottom: 8px;
+            font-size: 28px;
+            letter-spacing: 1px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .auth-tab.active {
+            color: var(--star-red);
+            border-bottom: 2px solid var(--star-red);
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-main);
+            outline: none;
+        }
+
+        .auth-input:focus {
+            border-color: var(--star-red);
+        }
+
+        .auth-error {
+            color: #ff4444;
+            font-size: 13px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: var(--star-red);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: var(--star-red-hover);
+        }
+
+        /* ----- ESTRUTURA PRINCIPAL DO STARCORD ----- */
+        #app-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .servers-bar {
+            width: 72px;
+            background-color: var(--bg-darkest);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            gap: 10px;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: var(--bg-dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            position: relative;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .server-icon:hover, .server-icon.active {
+            border-radius: 16px;
+            background-color: var(--star-red);
+        }
+
+        .btn-add-server {
+            color: #00e676;
+            font-size: 24px;
+            border: 2px dashed #00e676;
+            background: transparent;
+        }
+
+        .channels-bar {
+            width: 240px;
+            background-color: var(--bg-darker);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .server-header {
+            padding: 16px;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .channels-list {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .channel-item {
+            padding: 8px 12px;
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .channel-item:hover, .channel-item.active {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+        }
+
+        .user-footer {
+            height: 60px;
+            background-color: var(--bg-darkest);
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--star-red);
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #ff3333;
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            border: 2px solid var(--bg-darkest);
+        }
+
+        .user-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .user-name {
+            font-size: 14px;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-tag {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .chat-area {
+            flex: 1;
+            background-color: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            height: 50px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-weight: bold;
+            gap: 8px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+        }
+
+        .message-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .message-author {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .author-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: var(--star-red);
+        }
+
+        .badge-star {
+            background-color: var(--star-red);
+            color: white;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .timestamp {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .message-text {
+            font-size: 14px;
+            color: var(--text-main);
+            word-break: break-word;
+        }
+
+        .embed-box {
+            background: var(--bg-darker);
+            border-left: 4px solid var(--star-red);
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 6px;
+            max-width: 400px;
+        }
+
+        .chat-input-area {
+            padding: 16px;
+            background-color: var(--bg-dark);
+        }
+
+        .chat-input-wrapper {
+            background-color: var(--bg-light);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-main);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background: var(--bg-darker);
+            width: 100%;
+            max-width: 480px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .profile-banner {
+            height: 120px;
+            background: linear-gradient(135deg, var(--star-red), #500);
+            position: relative;
+        }
+
+        .profile-avatar-large {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 6px solid var(--bg-darker);
+            position: absolute;
+            bottom: -40px;
+            left: 20px;
+            background-size: cover;
+            background-position: center;
+            background-color: var(--star-red);
+        }
+
+        .profile-body {
+            padding: 50px 20px 20px 20px;
+        }
+
+        .profile-tag-box {
+            background: var(--bg-darkest);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .bio-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TELA DE AUTENTICAÇÃO COM LOGIN E CADASTRO -->
+    <div id="auth-screen">
+        <div class="auth-card">
+            <h1>StarCord</h1>
+            
+            <!-- ABAS -->
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="tab-login" onclick="switchAuthMode('login')">Entrar</div>
+                <div class="auth-tab" id="tab-register" onclick="switchAuthMode('register')">Cadastrar</div>
+            </div>
+
+            <!-- CAMPOS -->
+            <input type="text" id="auth-username" class="auth-input" placeholder="Nome de Usuário" style="display: none;">
+            <input type="email" id="auth-email" class="auth-input" placeholder="E-mail">
+            <input type="password" id="auth-password" class="auth-input" placeholder="Senha (mínimo 6 caracteres)">
+            
+            <div id="auth-error" class="auth-error"></div>
+
+            <button class="btn-primary" id="auth-submit-btn" onclick="handleAuth()">ENTRAR</button>
+        </div>
+    </div>
+
+    <!-- ESTRUTURA PRINCIPAL -->
+    <div id="app-container">
+        <!-- BARRA DE SERVIDORES -->
+        <div class="servers-bar" id="servers-bar">
+            <div class="server-icon active" title="Início" style="background-color: var(--star-red);">★</div>
+            <div class="server-icon btn-add-server" onclick="openModal('modal-server')" title="Criar Servidor">+</div>
+        </div>
+
+        <!-- BARRA DE CANAIS -->
+        <div class="channels-bar">
+            <div class="server-header">
+                <span id="server-title">Star Community</span>
+            </div>
+            <div class="channels-list">
+                <div class="channel-item active"># 💬-chat-geral</div>
+                <div class="channel-item"># 🎮-jogos</div>
+                <div class="channel-item"># 📢-anuncios</div>
+            </div>
+            <!-- USER FOOTER -->
+            <div class="user-footer">
+                <div class="avatar" id="user-avatar-small" onclick="openProfileModal()">
+                    <div class="status-indicator"></div>
+                </div>
+                <div class="user-info" onclick="openProfileModal()" style="cursor: pointer;">
+                    <div class="user-name" id="user-name-display">Carregando...</div>
+                    <div class="user-tag" id="user-status-display">-Online</div>
+                </div>
+                <button onclick="openModal('modal-edit-profile')" style="background:none; border:none; color:var(--text-muted); cursor:pointer;">⚙️</button>
+            </div>
+        </div>
+
+        <!-- ÁREA DE CHAT -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <span>#</span>
+                <span>💬-chat-geral</span>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="message">
+                    <div class="avatar" style="background-image: url('https://i.imgur.com/73AThR8.png');"></div>
+                    <div class="message-content">
+                        <div class="message-author">
+                            <span class="author-name">./Eduhh®️</span>
+                            <span class="badge-star">STAR</span>
+                            <span class="timestamp">Hoje às 23:07</span>
+                        </div>
+                        <div class="message-text">Servidor oficial configurado com sucesso no StarCord!</div>
+                        <div class="embed-box">
+                            <strong style="color: var(--star-red); display: block; margin-bottom: 6px;">IP E PORTA DO SERVIDOR</strong>
+                            <div><strong>IP:</strong> pandoramc.magnohost.com</div>
+                            <div><strong>PORTA:</strong> 25594</div>
+                            <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">VERSÃO: MAIS RECENTE</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ENTRADA DE CHAT -->
+            <div class="chat-input-area">
+                <div class="chat-input-wrapper">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Conversar em #💬-chat-geral" onkeydown="handleKeyPress(event)">
+                    <button class="btn-primary" style="width: auto; padding: 8px 16px;" onclick="sendMessage()">Enviar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE VISUALIZAÇÃO DE PERFIL -->
+    <div class="modal-overlay" id="modal-profile">
+        <div class="modal-content">
+            <div class="profile-banner">
+                <div class="profile-avatar-large" id="modal-avatar"></div>
+            </div>
+            <div class="profile-body">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2 id="modal-name" style="font-size: 20px;">Carregando...</h2>
+                        <span class="badge-star">STAR</span>
+                    </div>
+                    <button class="btn-primary" style="width: auto; padding: 6px 12px;" onclick="closeModal('modal-profile'); openModal('modal-edit-profile');">Editar perfil</button>
+                </div>
+
+                <div class="profile-tag-box">
+                    <div class="bio-title">Status</div>
+                    <div id="modal-status-text" style="font-size: 14px; margin-bottom: 10px;">-Online</div>
+                    <div class="bio-title">Sobre Mim</div>
+                    <div id="modal-bio-text" style="font-size: 13px; color: var(--text-main); white-space: pre-line;">Membro oficial do StarCord</div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn-primary" style="background: #e53935;" onclick="logout()">Sair da Conta</button>
+                    <button class="btn-primary" style="background: var(--bg-light);" onclick="closeModal('modal-profile')">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EDIÇÃO DE PERFIL -->
+    <div class="modal-overlay" id="modal-edit-profile">
+        <div class="modal-content" style="padding: 20px;">
+            <h3 style="margin-bottom: 15px; color: var(--star-red);">Editar Perfil</h3>
+            <label class="bio-title">Nome de Exibição</label>
+            <input type="text" id="edit-name-input" class="auth-input">
+            
+            <label class="bio-title">URL da Foto de Perfil (Avatar)</label>
+            <input type="text" id="edit-avatar-input" class="auth-input" placeholder="https://link-da-imagem.com/foto.jpg">
+            
+            <label class="bio-title">Status</label>
+            <input type="text" id="edit-status-input" class="auth-input">
+            
+            <label class="bio-title">Biografia (Bio)</label>
+            <textarea id="edit-bio-input" class="auth-input" style="height: 80px; resize: none;"></textarea>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn-primary" onclick="saveProfile()">Salvar</button>
+                <button class="btn-primary" style="background: var(--bg-light);" onclick="closeModal('modal-edit-profile')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CRIAR SERVIDOR -->
+    <div class="modal-overlay" id="modal-server">
+        <div class="modal-content" style="padding: 20px;">
+            <h3 style="margin-bottom: 15px; color: var(--star-red);">Criar um Servidor</h3>
+            <label class="bio-title">Nome do Servidor</label>
+            <input type="text" id="server-name-input" class="auth-input" placeholder="Servidor do Eduhh">
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn-primary" onclick="createNewServer()">Criar</button>
+                <button class="btn-primary" style="background: var(--bg-light);" onclick="closeModal('modal-server')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIGURAÇÃO COMPLETA DO FIREBASE E SCRIPT DA APLICAÇÃO -->
+    <script type="module">
+        import { initializeApp } from "firebase/app";
+        import { getAnalytics } from "firebase/analytics";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            createUserWithEmailAndPassword, 
+            onAuthStateChanged, 
+            updateProfile, 
+            signOut 
+        } from "firebase/auth";
+
+        // Firebase Configurações
+        const firebaseConfig = {
+          apiKey: "AIzaSyAoqc8NcgLAQqclCFY-q_PcxATIE0FqU_E",
+          authDomain: "starcord-ee336.firebaseapp.com",
+          projectId: "starcord-ee336",
+          storageBucket: "starcord-ee336.firebasestorage.app",
+          messagingSenderId: "166227286926",
+          appId: "1:166227286926:web:8cafd28b2eda5fbaf0e2df",
+          measurementId: "G-E06X0P832W"
+        };
+
+        // Inicializa o Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+
+        // Estado do usuário
+        let authMode = 'login';
+        let userData = {
+            name: "Usuário",
+            status: "-Online",
+            bio: "Membro oficial do StarCord",
+            avatar: "https://i.imgur.com/73AThR8.png"
+        };
+
+        // Alternar abas de Login / Cadastro
+        window.switchAuthMode = function(mode) {
+            authMode = mode;
+            const tabLogin = document.getElementById('tab-login');
+            const tabRegister = document.getElementById('tab-register');
+            const usernameInput = document.getElementById('auth-username');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            const errorDiv = document.getElementById('auth-error');
+
+            errorDiv.style.display = 'none';
+
+            if (mode === 'register') {
+                tabLogin.classList.remove('active');
+                tabRegister.classList.add('active');
+                usernameInput.style.display = 'block';
+                submitBtn.innerText = 'CADASTRAR';
+            } else {
+                tabRegister.classList.remove('active');
+                tabLogin.classList.add('active');
+                usernameInput.style.display = 'none';
+                submitBtn.innerText = 'ENTRAR';
+            }
+        };
+
+        // Processar Autenticação (Login / Cadastro)
+        window.handleAuth = async function() {
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+            const username = document.getElementById('auth-username').value.trim();
+            const errorDiv = document.getElementById('auth-error');
+
+            errorDiv.style.display = 'none';
+
+            if (!email || !password) {
+                showAuthError("Preencha e-mail e senha.");
+                return;
+            }
+
+            try {
+                if (authMode === 'register') {
+                    if (!username) {
+                        showAuthError("Digite um nome de usuário.");
+                        return;
+                    }
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    await updateProfile(userCredential.user, {
+                        displayName: username,
+                        photoURL: userData.avatar
+                    });
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (error) {
+                console.error(error);
+                let msg = "Erro ao autenticar. Verifique os dados.";
+                if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                    msg = "E-mail ou senha incorretos.";
+                } else if (error.code === 'auth/email-already-in-use') {
+                    msg = "Este e-mail já está cadastrado.";
+                } else if (error.code === 'auth/weak-password') {
+                    msg = "A senha deve ter pelo menos 6 caracteres.";
+                } else if (error.code === 'auth/invalid-email') {
+                    msg = "E-mail inválido.";
+                }
+                showAuthError(msg);
+            }
+        };
+
+        function showAuthError(msg) {
+            const errorDiv = document.getElementById('auth-error');
+            errorDiv.innerText = msg;
+            errorDiv.style.display = 'block';
+        }
+
+        // Monitorar Estado de Autenticação em Tempo Real
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userData.name = user.displayName || user.email.split('@')[0];
+                if (user.photoURL) userData.avatar = user.photoURL;
+                updateUserUI();
+                document.getElementById('auth-screen').style.display = 'none';
+            } else {
+                document.getElementById('auth-screen').style.display = 'flex';
+            }
+        });
+
+        // Logout
+        window.logout = function() {
+            signOut(auth).then(() => {
+                closeModal('modal-profile');
+            });
+        };
+
+        // Atualizar Interface do Usuário
+        window.updateUserUI = function() {
+            document.getElementById('user-name-display').innerText = userData.name;
+            document.getElementById('user-status-display').innerText = userData.status;
+            
+            const avatarElems = [
+                document.getElementById('user-avatar-small'),
+                document.getElementById('modal-avatar')
+            ];
+
+            avatarElems.forEach(elem => {
+                if(userData.avatar) {
+                    elem.style.backgroundImage = `url('${userData.avatar}')`;
+                } else {
+                    elem.style.backgroundImage = 'none';
+                }
+            });
+
+            document.getElementById('modal-name').innerText = userData.name;
+            document.getElementById('modal-status-text').innerText = userData.status;
+            document.getElementById('modal-bio-text').innerText = userData.bio;
+        };
+
+        // Enviar Mensagem
+        window.sendMessage = function() {
+            const input = document.getElementById('chat-input');
+            const messageText = input.value.trim();
+
+            if (!messageText) return;
+
+            const chatMessages = document.getElementById('chat-messages');
+            const now = new Date();
+            const timeString = `Hoje às ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            const messageHTML = `
+                <div class="message">
+                    <div class="avatar" style="background-image: url('${userData.avatar}');"></div>
+                    <div class="message-content">
+                        <div class="message-author">
+                            <span class="author-name">${escapeHTML(userData.name)}</span>
+                            <span class="badge-star">STAR</span>
+                            <span class="timestamp">${timeString}</span>
+                        </div>
+                        <div class="message-text">${escapeHTML(messageText)}</div>
+                    </div>
+                </div>
+            `;
+
+            chatMessages.insertAdjacentHTML('beforeend', messageHTML);
+            input.value = '';
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        };
+
+        window.handleKeyPress = function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        };
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        // Modais
+        window.openModal = function(id) {
+            if(id === 'modal-edit-profile') {
+                document.getElementById('edit-name-input').value = userData.name;
+                document.getElementById('edit-avatar-input').value = userData.avatar;
+                document.getElementById('edit-status-input').value = userData.status;
+                document.getElementById('edit-bio-input').value = userData.bio;
+            }
+            document.getElementById(id).style.display = 'flex';
+        };
+
+        window.closeModal = function(id) {
+            document.getElementById(id).style.display = 'none';
+        };
+
+        window.openProfileModal = function() {
+            updateUserUI();
+            openModal('modal-profile');
+        };
+
+        window.saveProfile = async function() {
+            userData.name = document.getElementById('edit-name-input').value || userData.name;
+            userData.avatar = document.getElementById('edit-avatar-input').value || userData.avatar;
+            userData.status = document.getElementById('edit-status-input').value || userData.status;
+            userData.bio = document.getElementById('edit-bio-input').value || userData.bio;
+
+            if (auth.currentUser) {
+                await updateProfile(auth.currentUser, {
+                    displayName: userData.name,
+                    photoURL: userData.avatar
+                });
+            }
+
+            updateUserUI();
+            closeModal('modal-edit-profile');
+        };
+
+        // Criar Servidor
+        window.createNewServer = function() {
+            const nameInput = document.getElementById('server-name-input');
+            const serverName = nameInput.value.trim();
+
+            if (serverName) {
+                const serversBar = document.getElementById('servers-bar');
+                const addBtn = document.querySelector('.btn-add-server');
+
+                const newServerIcon = document.createElement('div');
+                newServerIcon.className = 'server-icon';
+                newServerIcon.title = serverName;
+                newServerIcon.innerText = serverName.substring(0, 2).toUpperCase();
+
+                newServerIcon.onclick = function() {
+                    document.querySelectorAll('.server-icon').forEach(icon => icon.classList.remove('active'));
+                    newServerIcon.classList.add('active');
+                    document.getElementById('server-title').innerText = serverName;
+                };
+
+                serversBar.insertBefore(newServerIcon, addBtn);
+                nameInput.value = '';
+                closeModal('modal-server');
+            }
+        };
+    </script>
+</body>
+</html>
+
