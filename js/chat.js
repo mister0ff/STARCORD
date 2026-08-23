@@ -126,68 +126,88 @@ export async function processarTextoComEmbeds(text, bodyDiv) {
 
 /* ---------- Renderização genérica de uma lista de mensagens ---------- */
 
-async function renderizarMensagens(snapshot) {
-  chatMessages.innerHTML = '';
-  for (const docSnap of snapshot.docs) {
-    const data = docSnap.data();
-    let name = data.senderDisplayName;
-    let avatar = data.senderAvatar;
+// Monta uma única linha de mensagem (elemento DOM), sem tocar em chatMessages.
+async function montarLinhaMensagem(docSnap) {
+  const data = docSnap.data();
+  let name = data.senderDisplayName;
+  let avatar = data.senderAvatar;
 
-    if (!name || avatar === undefined) {
-      const p = await getProfileCached(data.sender);
-      name = p.displayName || data.sender;
-      avatar = p.avatarUrl || '';
-    }
-
-    let hora = '';
-    if (data.timestamp) {
-      hora = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
-    const row = document.createElement('div');
-    row.classList.add('chat-message-row');
-
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = 'chat-msg-avatar';
-    if (avatar) avatarDiv.style.backgroundImage = `url('${avatar}')`;
-    else avatarDiv.textContent = name ? name[0].toUpperCase() : '?';
-
-    const bodyDiv = document.createElement('div');
-    bodyDiv.className = 'chat-msg-body';
-
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'chat-msg-header';
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'chat-msg-name';
-    nameSpan.textContent = name;
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'chat-msg-time';
-    timeSpan.textContent = hora;
-
-    headerDiv.appendChild(nameSpan);
-    headerDiv.appendChild(timeSpan);
-    bodyDiv.appendChild(headerDiv);
-
-    if (data.text) {
-      await processarTextoComEmbeds(data.text, bodyDiv);
-    }
-
-    if (data.fileUrl) {
-      const img = document.createElement('img');
-      img.src = data.fileUrl;
-      img.alt = 'Anexo';
-      bodyDiv.appendChild(img);
-    }
-
-    row.appendChild(avatarDiv);
-    row.appendChild(bodyDiv);
-    chatMessages.appendChild(row);
+  if (!name || avatar === undefined) {
+    const p = await getProfileCached(data.sender);
+    name = p.displayName || data.sender;
+    avatar = p.avatarUrl || '';
   }
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  let hora = '';
+  if (data.timestamp) {
+    hora = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const row = document.createElement('div');
+  row.classList.add('chat-message-row');
+
+  const avatarDiv = document.createElement('div');
+  avatarDiv.className = 'chat-msg-avatar';
+  if (avatar) avatarDiv.style.backgroundImage = `url('${avatar}')`;
+  else avatarDiv.textContent = name ? name[0].toUpperCase() : '?';
+
+  const bodyDiv = document.createElement('div');
+  bodyDiv.className = 'chat-msg-body';
+
+  const headerDiv = document.createElement('div');
+  headerDiv.className = 'chat-msg-header';
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'chat-msg-name';
+  nameSpan.textContent = name;
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'chat-msg-time';
+  timeSpan.textContent = hora;
+
+  headerDiv.appendChild(nameSpan);
+  headerDiv.appendChild(timeSpan);
+  bodyDiv.appendChild(headerDiv);
+
+  if (data.text) {
+    await processarTextoComEmbeds(data.text, bodyDiv);
+  }
+
+  if (data.fileUrl) {
+    const img = document.createElement('img');
+    img.src = data.fileUrl;
+    img.alt = 'Anexo';
+    bodyDiv.appendChild(img);
+  }
+
+  row.appendChild(avatarDiv);
+  row.appendChild(bodyDiv);
+  return row;
+}
+
+// Renderiza a lista inteira SEM piscar: monta todas as linhas fora da tela
+// (num DocumentFragment) e só troca o conteúdo do chat de uma vez no final,
+// em vez de limpar (innerHTML = '') e ir preenchendo aos poucos.
+async function renderizarMensagens(snapshot) {
+  const fragment = document.createDocumentFragment();
+
+  for (const docSnap of snapshot.docs) {
+    const row = await montarLinhaMensagem(docSnap);
+    fragment.appendChild(row);
+  }
+
+  // Estava perto do fim do scroll antes de trocar? Se sim, mantém "colado" embaixo.
+  const estavaNoFim = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 80;
+
+  chatMessages.replaceChildren(fragment);
+
+  if (estavaNoFim || chatMessages.dataset.firstRender !== 'done') {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.dataset.firstRender = 'done';
+  }
 }
 
 export function carregarMensagensChatPrivado(friendUser) {
-  chatMessages.innerHTML = '';
+  chatMessages.replaceChildren();
+  delete chatMessages.dataset.firstRender;
   const roomId = [state.currentUsername, friendUser].sort().join('_');
   const q = query(collection(db, "chats", roomId, "messages"), orderBy("timestamp", "asc"));
   if (state.unsubscribeMessages) state.unsubscribeMessages();
@@ -351,4 +371,3 @@ export function initChat() {
 
 // Exporta também o renderizador genérico para ser usado por servers.js
 export { renderizarMensagens };
-
