@@ -40,8 +40,9 @@
         }
 
         html, body { 
-            width: 100vw; 
-            height: 100vh; 
+            width: 100%; 
+            height: 100%; 
+            height: 100dvh;
             overflow: hidden; 
             position: fixed; 
             inset: 0; 
@@ -123,16 +124,18 @@
         .btn-danger { background: #d32f2f; color: white; }
         .btn-danger:hover { background: #b71c1c; }
 
-        /* ----- LAYOUT FULLSCREEN ----- */
+        /* ----- LAYOUT FULLSCREEN FIXO ----- */
         #app-container { 
             display: flex; 
-            width: 100vw; 
-            height: 100vh; 
+            width: 100%; 
+            height: 100%; 
+            height: 100dvh;
             overflow: hidden;
         }
 
         .servers-bar { 
             width: 72px; 
+            height: 100%;
             background-color: var(--bg-darkest); 
             display: flex; 
             flex-direction: column; 
@@ -183,11 +186,13 @@
 
         .channels-bar { 
             width: 240px; 
+            height: 100%;
             background-color: var(--bg-darker); 
             display: flex; 
             flex-direction: column; 
             border-right: 1px solid var(--border-color); 
             flex-shrink: 0;
+            min-height: 0;
         }
         .server-header { 
             padding: 16px; 
@@ -197,8 +202,9 @@
             justify-content: space-between; 
             align-items: center; 
             height: 50px;
+            flex-shrink: 0;
         }
-        .channels-list { flex: 1; padding: 10px; overflow-y: auto; }
+        .channels-list { flex: 1; padding: 10px; overflow-y: auto; min-height: 0; }
         .channel-item { 
             padding: 8px 12px; 
             border-radius: 4px; 
@@ -258,6 +264,7 @@
             align-items: center; 
             gap: 10px; 
             border-top: 1px solid var(--border-color); 
+            flex-shrink: 0;
         }
         .avatar { 
             width: 40px; 
@@ -293,8 +300,16 @@
         }
         .btn-copy-tag:hover { background: var(--bg-light); color: var(--text-main); }
 
-        /* CHAT AREA */
-        .chat-area { flex: 1; background-color: var(--bg-dark); display: flex; flex-direction: column; overflow: hidden; }
+        /* CHAT AREA FIXO */
+        .chat-area { 
+            flex: 1; 
+            height: 100%;
+            background-color: var(--bg-dark); 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            min-width: 0;
+        }
         .chat-header { 
             height: 50px; 
             border-bottom: 1px solid var(--border-color); 
@@ -305,9 +320,17 @@
             gap: 8px; 
             flex-shrink: 0;
         }
-        .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .chat-messages { 
+            flex: 1; 
+            padding: 16px; 
+            overflow-y: auto; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px; 
+            min-height: 0;
+        }
         
-        /* STATE DE BEM-VINDO (SEM SERVIDOR PADRÃO) */
+        /* LANDING PAGE */
         .empty-landing { 
             flex: 1; 
             display: flex; 
@@ -363,7 +386,7 @@
         }
         .modal-content { 
             background: var(--bg-darker); 
-            width: 100%; 
+            width: 90%; 
             max-width: 480px; 
             border-radius: 12px; 
             overflow: hidden; 
@@ -447,13 +470,12 @@
 
     <!-- ESTRUTURA PRINCIPAL -->
     <div id="app-container">
-        <!-- BARRA DE SERVIDORES (SEM SERVIDOR PADRÃO) -->
+        <!-- BARRA DE SERVIDORES -->
         <div class="servers-bar" id="servers-bar">
             <div class="server-icon btn-friends-icon" onclick="openFriendsPanel()" title="Amigos" id="friends-icon-btn">
                 👥
                 <span class="req-badge" id="req-badge" style="display:none;">0</span>
             </div>
-            <!-- Servidores criados pelo usuário entram aqui -->
             <div class="server-icon btn-add-server" onclick="openModal('modal-server')" title="Criar Servidor">+</div>
         </div>
 
@@ -503,7 +525,7 @@
             <!-- MENSAGENS -->
             <div class="chat-messages" id="chat-messages" style="display:none;"></div>
 
-            <!-- TELA INICIAL (SEM SERVIDOR SELECIONADO) -->
+            <!-- TELA INICIAL -->
             <div class="empty-landing" id="empty-landing">
                 <h2>Boas-vindas ao StarCord!</h2>
                 <p>Crie o seu próprio servidor ou fale diretamente com um amigo para começar a conversar.</p>
@@ -607,7 +629,7 @@
         </div>
     </div>
 
-    <!-- MODAL CONVIDAR AMIGO PARA SERVIDOR -->
+    <!-- MODAL CONVIDAR AMIGO -->
     <div class="modal-overlay" id="modal-invite">
         <div class="modal-content" style="padding: 20px;">
             <h3 style="margin-bottom: 15px; color: var(--star-red);">Convidar para servidor</h3>
@@ -656,7 +678,6 @@
         let currentUid = null;
         let userData = { username: '', displayName: 'Usuário', status: '-Online', bio: '', avatar: DEFAULT_AVATAR };
 
-        // Contexto do chat: { type: 'none'|'server'|'dm', id: null|serverId|dmId, peerUid? }
         let currentContext = { type: 'none', id: null };
         let unsubMessages = null;
         let unsubUserDoc = null;
@@ -688,7 +709,7 @@
         };
 
         function sanitizeUsername(raw) {
-            return raw.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+            return (raw || '').trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
         }
 
         window.handleAuth = async function() {
@@ -715,7 +736,7 @@
                     await updateProfile(userCredential.user, { displayName: rawUsername, photoURL: DEFAULT_AVATAR });
 
                     await setDoc(doc(db, 'users', uid), {
-                        uid, username: uname, displayName: rawUsername,
+                        uid, username: uname, displayName: rawUsername || 'Usuário',
                         avatar: DEFAULT_AVATAR, status: '-Online', bio: '',
                         createdAt: serverTimestamp()
                     });
@@ -787,9 +808,9 @@
             signOut(auth).then(() => { closeModal('modal-profile'); });
         };
 
-        // ---------- EXCLUIR CONTA REAL ----------
+        // ---------- EXCLUIR CONTA ----------
         window.confirmDeleteAccount = async function() {
-            const confirmMsg = "ATENÇÃO: Deseja realmente excluir sua conta de forma permanente?\nTodos os seus dados serão apagados e essa ação não pode ser desfeita!";
+            const confirmMsg = "ATENÇÃO: Deseja realmente excluir sua conta de forma permanente?\nTodos os seus dados serão apagados!";
             if (!confirm(confirmMsg)) return;
 
             try {
@@ -797,20 +818,17 @@
                 if (!user) return;
                 const uid = user.uid;
 
-                // Deleta dados do Firestore
                 if (userData.username) {
                     await deleteDoc(doc(db, 'usernames', userData.username));
                 }
                 await deleteDoc(doc(db, 'users', uid));
-
-                // Deleta conta do Authentication
                 await deleteUser(user);
                 closeModal('modal-profile');
                 alert("Sua conta foi excluída com sucesso.");
             } catch (error) {
                 console.error("Erro ao excluir conta:", error);
                 if (error.code === 'auth/requires-recent-login') {
-                    alert("Por questões de segurança, faça login novamente para conseguir excluir sua conta.");
+                    alert("Por segurança, faça login novamente para excluir sua conta.");
                     await signOut(auth);
                 } else {
                     alert("Erro ao excluir conta: " + error.message);
@@ -818,21 +836,31 @@
             }
         };
 
-        // ---------- UI DE PERFIL & COPIAR TAG ----------
+        // ---------- UI DE PERFIL ----------
         window.updateUserUI = function() {
-            document.getElementById('user-name-display').innerText = userData.displayName || 'Usuário';
-            document.getElementById('user-status-display').innerText = userData.status || '-Online';
+            const nameEl = document.getElementById('user-name-display');
+            if (nameEl) nameEl.innerText = userData.displayName || 'Usuário';
             
             const handleText = '@' + (userData.username || 'usuario');
-            document.getElementById('user-handle-display').innerText = handleText;
-            document.getElementById('modal-handle-display').innerText = handleText;
+            const handleEl = document.getElementById('user-handle-display');
+            if (handleEl) handleEl.innerText = handleText;
+
+            const modalHandleEl = document.getElementById('modal-handle-display');
+            if (modalHandleEl) modalHandleEl.innerText = handleText;
 
             const avatarElems = [document.getElementById('user-avatar-small'), document.getElementById('modal-avatar')];
-            avatarElems.forEach(elem => { elem.style.backgroundImage = `url('${userData.avatar || DEFAULT_AVATAR}')`; });
+            avatarElems.forEach(elem => { 
+                if (elem) elem.style.backgroundImage = `url('${userData.avatar || DEFAULT_AVATAR}')`; 
+            });
             
-            document.getElementById('modal-name').innerText = userData.displayName || 'Usuário';
-            document.getElementById('modal-status-text').innerText = userData.status || '-Online';
-            document.getElementById('modal-bio-text').innerText = userData.bio || '';
+            const modalName = document.getElementById('modal-name');
+            if (modalName) modalName.innerText = userData.displayName || 'Usuário';
+
+            const modalStatus = document.getElementById('modal-status-text');
+            if (modalStatus) modalStatus.innerText = userData.status || '-Online';
+
+            const modalBio = document.getElementById('modal-bio-text');
+            if (modalBio) modalBio.innerText = userData.bio || '';
         };
 
         window.copyUserHandle = function() {
@@ -841,7 +869,7 @@
 
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(handleText).then(() => {
-                    alert('Copiado para a área de transferência: ' + handleText);
+                    alert('Copiado: ' + handleText);
                 }).catch(() => fallbackCopy(handleText));
             } else {
                 fallbackCopy(handleText);
@@ -866,10 +894,10 @@
         };
 
         window.saveProfile = async function() {
-            const newName = document.getElementById('edit-name-input').value.trim() || userData.displayName;
-            const newStatus = document.getElementById('edit-status-input').value.trim() || userData.status;
+            const newName = document.getElementById('edit-name-input').value.trim() || userData.displayName || 'Usuário';
+            const newStatus = document.getElementById('edit-status-input').value.trim() || userData.status || '-Online';
             const newBio = document.getElementById('edit-bio-input').value.slice(0, 20);
-            const newAvatar = pendingAvatarDataURL || userData.avatar;
+            const newAvatar = pendingAvatarDataURL || userData.avatar || DEFAULT_AVATAR;
 
             await updateDoc(doc(db, 'users', currentUid), {
                 displayName: newName, status: newStatus, bio: newBio, avatar: newAvatar
@@ -1004,7 +1032,6 @@
             preview.innerHTML = '📷<span>Ícone</span>';
             closeModal('modal-server');
 
-            // Troca imediatamente para o novo servidor criado
             switchToServer(newDoc.id, serverName);
         };
 
@@ -1022,25 +1049,34 @@
             let raw = input.value.trim();
             if (raw.startsWith('@')) raw = raw.slice(1);
             const uname = sanitizeUsername(raw);
-            if (!uname) return;
-            if (uname === userData.username) { alert('Você não pode se adicionar.'); return; }
+            if (!uname) { alert('Digite um nome de usuário.'); return; }
+            
+            if (userData && userData.username && uname === userData.username) { 
+                alert('Você não pode adicionar a si mesmo.'); 
+                return; 
+            }
 
-            const unameSnap = await getDoc(doc(db, 'usernames', uname));
-            if (!unameSnap.exists()) { alert('Usuário não encontrado.'); return; }
-            const targetUid = unameSnap.data().uid;
+            try {
+                const unameSnap = await getDoc(doc(db, 'usernames', uname));
+                if (!unameSnap.exists()) { alert('Usuário não encontrado.'); return; }
+                const targetUid = unameSnap.data().uid;
 
-            if (latestFriends.some(f => f.uid === targetUid)) { alert('Vocês já são amigos.'); return; }
+                if (latestFriends.some(f => f.uid === targetUid)) { alert('Vocês já são amigos.'); return; }
 
-            await setDoc(doc(db, 'friendRequests', targetUid, 'items', currentUid), {
-                fromUid: currentUid,
-                fromUsername: userData.username,
-                fromName: userData.displayName,
-                fromAvatar: userData.avatar || DEFAULT_AVATAR,
-                createdAt: serverTimestamp()
-            });
+                await setDoc(doc(db, 'friendRequests', targetUid, 'items', currentUid), {
+                    fromUid: currentUid,
+                    fromUsername: userData.username || 'usuario',
+                    fromName: userData.displayName || 'Usuário',
+                    fromAvatar: userData.avatar || DEFAULT_AVATAR,
+                    createdAt: serverTimestamp()
+                });
 
-            input.value = '';
-            alert('Pedido de amizade enviado!');
+                input.value = '';
+                alert('Pedido de amizade enviado!');
+            } catch (err) {
+                console.error("Erro ao adicionar amigo:", err);
+                alert("Erro ao enviar pedido de amizade: " + err.message);
+            }
         };
 
         function listenToFriendRequests() {
@@ -1055,8 +1091,8 @@
                     const el = document.createElement('div');
                     el.className = 'request-item';
                     el.innerHTML = `
-                        <div class="mini-avatar" style="background-image:url('${r.fromAvatar}')"></div>
-                        <div class="fname">${escapeHTML(r.fromName)}</div>
+                        <div class="mini-avatar" style="background-image:url('${r.fromAvatar || DEFAULT_AVATAR}')"></div>
+                        <div class="fname">${escapeHTML(r.fromName || 'Usuário')}</div>
                         <div class="req-actions" style="display:flex; gap:4px;">
                             <button style="background:#00c853;color:white;" title="Aceitar">✓</button>
                             <button style="background:#e53935;color:white;" title="Recusar">✕</button>
@@ -1071,10 +1107,10 @@
 
         async function acceptFriendRequest(r) {
             await setDoc(doc(db, 'friends', currentUid, 'list', r.fromUid), {
-                uid: r.fromUid, username: r.fromUsername, displayName: r.fromName, avatar: r.fromAvatar
+                uid: r.fromUid, username: r.fromUsername || '', displayName: r.fromName || 'Usuário', avatar: r.fromAvatar || DEFAULT_AVATAR
             });
             await setDoc(doc(db, 'friends', r.fromUid, 'list', currentUid), {
-                uid: currentUid, username: userData.username, displayName: userData.displayName, avatar: userData.avatar || DEFAULT_AVATAR
+                uid: currentUid, username: userData.username || '', displayName: userData.displayName || 'Usuário', avatar: userData.avatar || DEFAULT_AVATAR
             });
             await deleteDoc(doc(db, 'friendRequests', currentUid, 'items', r.fromUid));
         }
@@ -1094,8 +1130,8 @@
                     const el = document.createElement('div');
                     el.className = 'friend-item';
                     el.innerHTML = `
-                        <div class="mini-avatar" style="background-image:url('${f.avatar}')"></div>
-                        <div class="fname">${escapeHTML(f.displayName)}</div>
+                        <div class="mini-avatar" style="background-image:url('${f.avatar || DEFAULT_AVATAR}')"></div>
+                        <div class="fname">${escapeHTML(f.displayName || 'Amigo')}</div>
                         <button class="invite-btn">Convidar</button>`;
                     el.querySelector('.fname').onclick = () => openDM(f);
                     el.querySelector('.mini-avatar').onclick = () => openDM(f);
@@ -1112,8 +1148,8 @@
             document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
             document.getElementById('server-title').innerText = 'Amigos';
             document.getElementById('chat-header-icon').innerText = '@';
-            document.getElementById('chat-header-title').innerText = friend.displayName;
-            document.getElementById('chat-input').placeholder = `Conversar com @${friend.username}`;
+            document.getElementById('chat-header-title').innerText = friend.displayName || 'Amigo';
+            document.getElementById('chat-input').placeholder = `Conversar com @${friend.username || ''}`;
             currentContext = { type: 'dm', id: dmIdFor(currentUid, friend.uid), peerUid: friend.uid };
             listenToMessages();
         };
@@ -1156,7 +1192,7 @@
         function listenToMessages() {
             if (unsubMessages) { unsubMessages(); unsubMessages = null; }
             const ctx = currentContext;
-            if (ctx.type === 'none') return;
+            if (ctx.type === 'none' || !ctx.id) return;
 
             const q = query(messagesColRef(ctx), orderBy('createdAt', 'asc'));
             unsubMessages = onSnapshot(q, (snap) => {
@@ -1178,12 +1214,10 @@
             const wrapper = document.createElement('div');
             wrapper.className = 'message';
 
-            let timeStr = '';
+            let timeStr = 'agora';
             if (m.createdAt && m.createdAt.toDate) {
                 const d = m.createdAt.toDate();
                 timeStr = `Hoje às ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-            } else {
-                timeStr = 'agora';
             }
 
             wrapper.innerHTML = `
@@ -1203,25 +1237,30 @@
         }
 
         window.sendMessage = async function() {
-            if (currentContext.type === 'none') return;
+            if (currentContext.type === 'none' || !currentContext.id) return;
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
             if (!text) return;
             input.value = '';
 
-            await addDoc(messagesColRef(currentContext), {
-                text,
-                authorId: currentUid,
-                authorName: userData.displayName,
-                authorAvatar: userData.avatar || DEFAULT_AVATAR,
-                createdAt: serverTimestamp()
-            });
+            try {
+                await addDoc(messagesColRef(currentContext), {
+                    text,
+                    authorId: currentUid,
+                    authorName: userData.displayName || 'Usuário',
+                    authorAvatar: userData.avatar || DEFAULT_AVATAR,
+                    createdAt: serverTimestamp()
+                });
+            } catch (err) {
+                console.error("Erro ao enviar mensagem:", err);
+                alert("Erro ao enviar mensagem: " + err.message);
+            }
         };
 
         window.handleKeyPress = function(e) { if (e.key === 'Enter') sendMessage(); };
 
         function escapeHTML(str) {
-            return String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+            return String(str || '').replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
         }
 
         // ---------- APAGAR MENSAGEM ----------
@@ -1277,3 +1316,4 @@
     </script>
 </body>
 </html>
+
