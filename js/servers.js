@@ -112,7 +112,8 @@ export async function abrirServidorChat(serverId) {
 }
 
 function carregarMensagensServidor(serverId) {
-  chatMessages.innerHTML = '';
+  chatMessages.replaceChildren();
+  delete chatMessages.dataset.firstRender;
   const q = query(collection(db, "servers", serverId, "messages"), orderBy("timestamp", "asc"));
   if (state.unsubscribeMessages) state.unsubscribeMessages();
 
