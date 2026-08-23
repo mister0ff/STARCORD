@@ -1,6 +1,5 @@
 // js/chat.js
-// Lista de amigos, chat privado (1:1), envio de mensagens/arquivos e
-// renderização de embeds de convite de servidor dentro das mensagens.
+// Lista de amigos, chat privado, envio de mensagens e botão de voltar no canto esquerdo superior.
 
 import {
   collection, doc, addDoc, getDoc, setDoc, query, orderBy, onSnapshot,
@@ -9,7 +8,7 @@ import {
 import { db } from "./config.js";
 import { state } from "./state.js";
 import { cleanUsername, getProfileCached, showToast } from "./utils.js";
-import { abrirServidorChat } from "./servers.js";
+import { selecionarServidor } from "./servers.js";
 import {
   friendUsernameInput,
   btnAddFriend,
@@ -26,7 +25,7 @@ import {
   appScreen
 } from "./dom.js";
 
-/* ---------- Renderização de embeds de convite dentro do texto ---------- */
+/* ---------- Embeds de Convites em Mensagens ---------- */
 
 export async function processarTextoComEmbeds(text, bodyDiv) {
   if (!text) return;
@@ -75,7 +74,7 @@ export async function processarTextoComEmbeds(text, bodyDiv) {
                 <div class="invite-embed-avatar" ${sData.iconUrl ? 'style="background-image:url(\''+sData.iconUrl+'\')"' : ''}>${sData.iconUrl ? '' : sData.name[0].toUpperCase()}</div>
                 <div class="invite-embed-title-area">
                   <div class="invite-embed-name">${sData.name} <span style="color:#23c268; font-size:12px;" title="Verificado">✔</span></div>
-                  <div class="invite-embed-members">🟢 ${Math.floor(Math.random()*15 + 3)} online • ${sData.members ? sData.members.length : 1} membros</div>
+                  <div class="invite-embed-members">🟢 Online • ${sData.members ? sData.members.length : 1} membros</div>
                 </div>
               </div>
               <div class="invite-embed-desc-text">${sData.description || 'Servidor da comunidade Starcord.'}</div>
@@ -91,7 +90,7 @@ export async function processarTextoComEmbeds(text, bodyDiv) {
               });
               showToast(`Você entrou em ${sData.name}!`, 'success');
             }
-            abrirServidorChat(sId);
+            selecionarServidor(sId);
           });
 
         } else {
@@ -99,7 +98,7 @@ export async function processarTextoComEmbeds(text, bodyDiv) {
             <div class="invite-embed-banner" style="background-color: #ff4d4d;"></div>
             <div class="invite-embed-body">
               <div class="invite-embed-name" style="color: #ff4d4d;">Convite Inválido</div>
-              <div class="invite-embed-desc-text">O link <b>starcord.gg/${inviteCode}</b> não existe ou o servidor foi excluído.</div>
+              <div class="invite-embed-desc-text">O link <b>starcord.gg/${inviteCode}</b> não existe ou foi removido.</div>
             </div>
           `;
         }
@@ -124,9 +123,8 @@ export async function processarTextoComEmbeds(text, bodyDiv) {
   bodyDiv.appendChild(textDiv);
 }
 
-/* ---------- Renderização genérica de uma lista de mensagens ---------- */
+/* ---------- Renderização de Linha de Mensagem ---------- */
 
-// Monta uma única linha de mensagem (elemento DOM), sem tocar em chatMessages.
 async function montarLinhaMensagem(docSnap) {
   const data = docSnap.data();
   let name = data.senderDisplayName;
@@ -183,10 +181,7 @@ async function montarLinhaMensagem(docSnap) {
   return row;
 }
 
-// Renderiza a lista inteira SEM piscar: monta todas as linhas fora da tela
-// (num DocumentFragment) e só troca o conteúdo do chat de uma vez no final,
-// em vez de limpar (innerHTML = '') e ir preenchendo aos poucos.
-async function renderizarMensagens(snapshot) {
+export async function renderizarMensagens(snapshot) {
   const fragment = document.createDocumentFragment();
 
   for (const docSnap of snapshot.docs) {
@@ -194,7 +189,6 @@ async function renderizarMensagens(snapshot) {
     fragment.appendChild(row);
   }
 
-  // Estava perto do fim do scroll antes de trocar? Se sim, mantém "colado" embaixo.
   const estavaNoFim = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 80;
 
   chatMessages.replaceChildren(fragment);
@@ -217,7 +211,7 @@ export function carregarMensagensChatPrivado(friendUser) {
   });
 }
 
-/* ---------- Amigos ---------- */
+/* ---------- Lista de Amigos ---------- */
 
 export function carregarAmigos() {
   const friendsRef = collection(db, "users", state.currentUsername, "friends");
@@ -249,6 +243,7 @@ export function carregarAmigos() {
 async function abrirChatAmigo(friendUser, pData) {
   state.targetUsername = friendUser;
   state.currentServerId = null;
+  state.currentChannelId = null;
   state.activeServerData = null;
   btnServerHeaderInfo.classList.add('hidden');
 
@@ -266,44 +261,49 @@ async function abrirChatAmigo(friendUser, pData) {
   carregarMensagensChatPrivado(friendUser);
 }
 
-/* ---------- Inicialização de eventos ---------- */
+/* ---------- Eventos Globais do Chat ---------- */
 
 export function initChat() {
-  [friendUsernameInput].forEach(input => {
-    input.addEventListener('input', (e) => {
+  if (friendUsernameInput) {
+    friendUsernameInput.addEventListener('input', (e) => {
       e.target.value = cleanUsername(e.target.value);
     });
-  });
+  }
 
-  btnBack.addEventListener('click', () => {
-    appScreen.classList.remove('chat-open');
-    state.targetUsername = null;
-    state.currentServerId = null;
-    state.activeServerData = null;
-    btnServerHeaderInfo.classList.add('hidden');
-  });
+  if (btnBack) {
+    btnBack.addEventListener('click', () => {
+      appScreen.classList.remove('chat-open');
+      state.targetUsername = null;
+      state.currentServerId = null;
+      state.currentChannelId = null;
+      state.activeServerData = null;
+      if (btnServerHeaderInfo) btnServerHeaderInfo.classList.add('hidden');
+    });
+  }
 
-  btnAddFriend.addEventListener('click', async () => {
-    const friendUser = cleanUsername(friendUsernameInput.value);
-    if (!friendUser) return;
-    if (friendUser === state.currentUsername) { showToast('Você não pode adicionar a si mesmo.'); return; }
+  if (btnAddFriend) {
+    btnAddFriend.addEventListener('click', async () => {
+      const friendUser = cleanUsername(friendUsernameInput.value);
+      if (!friendUser) return;
+      if (friendUser === state.currentUsername) { showToast('Você não pode adicionar a si mesmo.'); return; }
 
-    btnAddFriend.disabled = true;
-    try {
-      const friendProfileSnap = await getDoc(doc(db, "profiles", friendUser));
-      if (!friendProfileSnap.exists()) { showToast('Usuário não encontrado.'); return; }
+      btnAddFriend.disabled = true;
+      try {
+        const friendProfileSnap = await getDoc(doc(db, "profiles", friendUser));
+        if (!friendProfileSnap.exists()) { showToast('Usuário não encontrado.'); return; }
 
-      await setDoc(doc(db, "users", state.currentUsername, "friends", friendUser), { username: friendUser, addedAt: serverTimestamp() });
-      await setDoc(doc(db, "users", friendUser, "friends", state.currentUsername), { username: state.currentUsername, addedAt: serverTimestamp() });
+        await setDoc(doc(db, "users", state.currentUsername, "friends", friendUser), { username: friendUser, addedAt: serverTimestamp() });
+        await setDoc(doc(db, "users", friendUser, "friends", state.currentUsername), { username: state.currentUsername, addedAt: serverTimestamp() });
 
-      friendUsernameInput.value = '';
-      showToast(`@${friendUser} adicionado!`, 'success');
-    } catch (err) {
-      showToast('Erro ao adicionar amigo: ' + err.message);
-    } finally {
-      btnAddFriend.disabled = false;
-    }
-  });
+        friendUsernameInput.value = '';
+        showToast(`@${friendUser} adicionado!`, 'success');
+      } catch (err) {
+        showToast('Erro ao adicionar amigo: ' + err.message);
+      } finally {
+        btnAddFriend.disabled = false;
+      }
+    });
+  }
 
   chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -313,15 +313,18 @@ export function initChat() {
 
     const myProfile = await getProfileCached(state.currentUsername);
 
-    if (state.currentServerId) {
-      await addDoc(collection(db, "servers", state.currentServerId, "messages"), {
-        text: text,
-        fileUrl: null,
-        sender: state.currentUsername,
-        senderDisplayName: myProfile.displayName || state.currentUsername,
-        senderAvatar: myProfile.avatarUrl || '',
-        timestamp: serverTimestamp()
-      });
+    if (state.currentServerId && state.currentChannelId) {
+      await addDoc(
+        collection(db, "servers", state.currentServerId, "channels", state.currentChannelId, "messages"),
+        {
+          text: text,
+          fileUrl: null,
+          sender: state.currentUsername,
+          senderDisplayName: myProfile.displayName || state.currentUsername,
+          senderAvatar: myProfile.avatarUrl || '',
+          timestamp: serverTimestamp()
+        }
+      );
     } else if (state.targetUsername) {
       const roomId = [state.currentUsername, state.targetUsername].sort().join('_');
       await addDoc(collection(db, "chats", roomId, "messages"), {
@@ -343,15 +346,18 @@ export function initChat() {
       const fileUrl = event.target.result;
       const myProfile = await getProfileCached(state.currentUsername);
 
-      if (state.currentServerId) {
-        await addDoc(collection(db, "servers", state.currentServerId, "messages"), {
-          text: '',
-          fileUrl: fileUrl,
-          sender: state.currentUsername,
-          senderDisplayName: myProfile.displayName || state.currentUsername,
-          senderAvatar: myProfile.avatarUrl || '',
-          timestamp: serverTimestamp()
-        });
+      if (state.currentServerId && state.currentChannelId) {
+        await addDoc(
+          collection(db, "servers", state.currentServerId, "channels", state.currentChannelId, "messages"),
+          {
+            text: '',
+            fileUrl: fileUrl,
+            sender: state.currentUsername,
+            senderDisplayName: myProfile.displayName || state.currentUsername,
+            senderAvatar: myProfile.avatarUrl || '',
+            timestamp: serverTimestamp()
+          }
+        );
       } else if (state.targetUsername) {
         const roomId = [state.currentUsername, state.targetUsername].sort().join('_');
         await addDoc(collection(db, "chats", roomId, "messages"), {
@@ -368,6 +374,3 @@ export function initChat() {
     e.target.value = '';
   });
 }
-
-// Exporta também o renderizador genérico para ser usado por servers.js
-export { renderizarMensagens };
