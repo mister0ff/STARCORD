@@ -3,8 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat em Tempo Real</title>
+  <title>Starcord - Dark Red</title>
   <style>
+    :root {
+      --bg-dark: #121212;
+      --bg-panel: #1e1e1e;
+      --bg-hover: #2a2a2a;
+      --bg-input: #292929;
+      --accent-red: #e50914;
+      --accent-red-hover: #b80710;
+      --text-main: #f5f5f5;
+      --text-muted: #aaaaaa;
+      --border-color: #333333;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -16,17 +28,18 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #f0f2f5;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
     }
 
-    /* Modais de Entrada (Login e Seleção de Chat) */
-    .modal-screen {
+    /* Tela de Autenticação */
+    .auth-screen {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      background-color: #f0f2f5;
+      background-color: var(--bg-dark);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -34,11 +47,12 @@
       padding: 20px;
     }
 
-    .card {
-      background: #ffffff;
+    .auth-card {
+      background: var(--bg-panel);
       padding: 32px;
       border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border-color);
       width: 100%;
       max-width: 400px;
       display: flex;
@@ -46,85 +60,161 @@
       gap: 16px;
     }
 
-    .card h2 {
-      color: #0084ff;
-      font-size: 22px;
+    .auth-card h2 {
+      color: var(--accent-red);
+      font-size: 24px;
       text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
 
-    .card input {
+    /* Inputs e Botões */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
       width: 100%;
       padding: 12px 16px;
-      border: 1px solid #cccccc;
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
+      color: var(--text-main);
       outline: none;
       font-size: 14px;
     }
 
-    .card button {
-      width: 100%;
-      background-color: #0084ff;
+    input:focus {
+      border-color: var(--accent-red);
+    }
+
+    .btn {
+      background-color: var(--accent-red);
       color: white;
       border: none;
-      padding: 12px;
+      padding: 12px 20px;
       border-radius: 8px;
       font-weight: bold;
       cursor: pointer;
-      font-size: 15px;
+      font-size: 14px;
+      transition: background-color 0.2s;
     }
 
-    .card button:hover {
-      background-color: #006bce;
+    .btn:hover {
+      background-color: var(--accent-red-hover);
     }
 
-    .card .error-msg {
-      color: #d93025;
+    .btn-secondary {
+      background-color: #333333;
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background-color: #444444;
+    }
+
+    .error-msg {
+      color: #ff5252;
       font-size: 12px;
       text-align: center;
     }
 
-    /* Interface do Chat Fullscreen */
-    .chat-container {
+    /* Layout Principal (Sidebar + Chat) */
+    .app-container {
+      display: flex;
       width: 100vw;
       height: 100vh;
-      background-color: #ffffff;
+    }
+
+    /* Barra Lateral de Amigos */
+    .sidebar {
+      width: 300px;
+      background-color: var(--bg-panel);
+      border-right: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
     }
 
-    .chat-header {
-      background-color: #0084ff;
-      color: #ffffff;
-      padding: 16px 24px;
+    .user-profile {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: rgba(229, 9, 20, 0.05);
+    }
+
+    .user-profile span {
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--accent-red);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
+    }
+
+    .add-friend-box {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      gap: 8px;
+    }
+
+    .friends-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .friend-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid #282828;
+      cursor: pointer;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      z-index: 10;
+      gap: 12px;
+      transition: background-color 0.2s;
     }
 
-    .user-info h3 {
-      font-size: 18px;
-      font-weight: 600;
+    .friend-item:hover, .friend-item.active {
+      background-color: var(--bg-hover);
+      border-left: 4px solid var(--accent-red);
     }
 
-    .user-info span {
-      font-size: 12px;
-      opacity: 0.85;
+    .friend-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background-color: var(--accent-red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
     }
 
-    .header-actions button {
-      background: rgba(255, 255, 255, 0.2);
-      border: none;
-      color: white;
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
+    .friend-email {
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    .header-actions button:hover {
-      background: rgba(255, 255, 255, 0.3);
+    /* Área Principal do Chat */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--bg-dark);
+    }
+
+    .chat-header {
+      padding: 16px 24px;
+      background-color: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
     .chat-messages {
@@ -134,31 +224,54 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
-      background-color: #f0f2f5;
+    }
+
+    .empty-chat {
+      margin: auto;
+      color: var(--text-muted);
+      text-align: center;
     }
 
     .message {
       max-width: 60%;
-      padding: 12px 18px;
-      border-radius: 18px;
-      font-size: 15px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
       line-height: 1.4;
       word-wrap: break-word;
+      position: relative;
     }
 
     .message.received {
       align-self: flex-start;
-      background-color: #ffffff;
-      color: #050505;
-      border-bottom-left-radius: 4px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-bottom-left-radius: 2px;
     }
 
     .message.sent {
       align-self: flex-end;
-      background-color: #0084ff;
-      color: #ffffff;
-      border-bottom-right-radius: 4px;
+      background-color: var(--accent-red);
+      color: white;
+      border-bottom-right-radius: 2px;
+    }
+
+    .message img {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 8px;
+      margin-top: 6px;
+      display: block;
+    }
+
+    .message a.file-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #fff;
+      text-decoration: underline;
+      margin-top: 4px;
+      word-break: break-all;
     }
 
     .time {
@@ -171,29 +284,35 @@
 
     .chat-footer {
       padding: 16px 24px;
-      background-color: #ffffff;
-      border-top: 1px solid #e4e6eb;
+      background-color: var(--bg-panel);
+      border-top: 1px solid var(--border-color);
       display: flex;
       gap: 12px;
+      align-items: center;
     }
 
-    .chat-footer input {
-      flex: 1;
-      padding: 14px 20px;
-      border: 1px solid #cccccc;
-      border-radius: 24px;
-      outline: none;
-      font-size: 15px;
-    }
-
-    .chat-footer button {
-      background-color: #0084ff;
-      color: white;
-      border: none;
-      padding: 14px 28px;
-      border-radius: 24px;
+    .file-btn {
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      font-weight: bold;
+      font-size: 18px;
+      transition: background-color 0.2s;
+    }
+
+    .file-btn:hover {
+      background-color: var(--bg-hover);
+      border-color: var(--accent-red);
+    }
+
+    #fileInput {
+      display: none;
     }
 
     .hidden {
@@ -203,46 +322,56 @@
 </head>
 <body>
 
-  <!-- Tela 1: Login / Cadastro -->
-  <div id="authScreen" class="modal-screen">
-    <div class="card">
-      <h2>Entrar no Starcord</h2>
+  <!-- Tela de Login / Cadastro -->
+  <div id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <h2>Starcord</h2>
       <input type="email" id="authEmail" placeholder="Seu e-mail" required />
       <input type="password" id="authPassword" placeholder="Sua senha" required />
-      <button id="btnLogin">Entrar / Cadastrar</button>
+      <button class="btn" id="btnLogin">Entrar / Cadastrar</button>
       <div id="authError" class="error-msg"></div>
     </div>
   </div>
 
-  <!-- Tela 2: Seleção do E-mail de Destino -->
-  <div id="targetScreen" class="modal-screen hidden">
-    <div class="card">
-      <h2>Iniciar Conversa</h2>
-      <p style="font-size: 13px; color: #666; text-align: center;">Digite o e-mail da pessoa com quem deseja conversar:</p>
-      <input type="email" id="targetEmail" placeholder="E-mail do contato" required />
-      <button id="btnStartChat">Iniciar Chat</button>
-      <button id="btnLogout" style="background-color: #dc3545;">Sair da Conta</button>
-    </div>
-  </div>
+  <!-- Interface Principal -->
+  <div id="appScreen" class="app-container hidden">
+    <!-- Sidebar: Lista de Amigos -->
+    <div class="sidebar">
+      <div class="user-profile">
+        <span id="userEmailLabel">usuario@email.com</span>
+        <button class="btn btn-secondary" id="btnLogout" style="padding: 6px 10px; font-size: 12px;">Sair</button>
+      </div>
 
-  <!-- Tela 3: Chat Fullscreen -->
-  <div id="chatScreen" class="chat-container hidden">
-    <div class="chat-header">
-      <div class="user-info">
-        <h3 id="chatTargetTitle">Contato</h3>
-        <span id="currentUserLabel">Logado como: ...</span>
+      <div class="add-friend-box">
+        <input type="email" id="friendEmailInput" placeholder="E-mail do amigo" />
+        <button class="btn" id="btnAddFriend" style="padding: 0 14px;">+</button>
       </div>
-      <div class="header-actions">
-        <button id="btnChangeChat">Trocar Contato</button>
-      </div>
+
+      <div class="friends-list" id="friendsList"></div>
     </div>
 
-    <div class="chat-messages" id="chatMessages"></div>
+    <!-- Área do Chat -->
+    <div class="chat-area">
+      <div id="noChatSelected" class="empty-chat">
+        <h3>Selecione ou adicione um amigo para conversar</h3>
+      </div>
 
-    <form class="chat-footer" id="chatForm">
-      <input type="text" id="messageInput" placeholder="Digite uma mensagem..." autocomplete="off" required />
-      <button type="submit">Enviar</button>
-    </form>
+      <div id="activeChat" class="chat-area hidden">
+        <div class="chat-header">
+          <div class="friend-avatar" id="chatAvatar">A</div>
+          <h3 id="chatTargetTitle">amigo@email.com</h3>
+        </div>
+
+        <div class="chat-messages" id="chatMessages"></div>
+
+        <form class="chat-footer" id="chatForm">
+          <label for="fileInput" class="file-btn" title="Enviar Imagem ou Arquivo">📎</label>
+          <input type="file" id="fileInput" />
+          <input type="text" id="messageInput" placeholder="Digite uma mensagem..." autocomplete="off" />
+          <button type="submit" class="btn">Enviar</button>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- Firebase Web SDK Modules -->
@@ -258,14 +387,22 @@
     import { 
       getFirestore, 
       collection, 
+      doc, 
+      setDoc, 
       addDoc, 
       query, 
       orderBy, 
       onSnapshot, 
       serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { 
+      getStorage, 
+      ref, 
+      uploadBytes, 
+      getDownloadURL 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
-    // Configuração do seu projeto Firebase
+    // Configurações do Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyAoqc8NcgLAQqclCFY-q_PcxATIE0FqU_E",
       authDomain: "starcord-ee336.firebaseapp.com",
@@ -279,51 +416,52 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const storage = getStorage(app);
 
     let currentUser = null;
     let targetUserEmail = null;
-    let unsubscribeSnapshot = null;
+    let unsubscribeMessages = null;
 
     // Elementos DOM
     const authScreen = document.getElementById('authScreen');
-    const targetScreen = document.getElementById('targetScreen');
-    const chatScreen = document.getElementById('chatScreen');
-
+    const appScreen = document.getElementById('appScreen');
     const authEmail = document.getElementById('authEmail');
     const authPassword = document.getElementById('authPassword');
     const btnLogin = document.getElementById('btnLogin');
     const authError = document.getElementById('authError');
 
-    const targetEmail = document.getElementById('targetEmail');
-    const btnStartChat = document.getElementById('btnStartChat');
+    const userEmailLabel = document.getElementById('userEmailLabel');
     const btnLogout = document.getElementById('btnLogout');
-    const btnChangeChat = document.getElementById('btnChangeChat');
 
+    const friendEmailInput = document.getElementById('friendEmailInput');
+    const btnAddFriend = document.getElementById('btnAddFriend');
+    const friendsList = document.getElementById('friendsList');
+
+    const noChatSelected = document.getElementById('noChatSelected');
+    const activeChat = document.getElementById('activeChat');
     const chatTargetTitle = document.getElementById('chatTargetTitle');
-    const currentUserLabel = document.getElementById('currentUserLabel');
+    const chatAvatar = document.getElementById('chatAvatar');
     const chatMessages = document.getElementById('chatMessages');
     const chatForm = document.getElementById('chatForm');
     const messageInput = document.getElementById('messageInput');
+    const fileInput = document.getElementById('fileInput');
 
     // 1. Monitorar estado de autenticação
     onAuthStateChanged(auth, (user) => {
       if (user) {
         currentUser = user;
+        userEmailLabel.textContent = user.email;
         authScreen.classList.add('hidden');
-        if (!targetUserEmail) {
-          targetScreen.classList.remove('hidden');
-          chatScreen.classList.add('hidden');
-        }
+        appScreen.classList.remove('hidden');
+        carregarAmigos();
       } else {
         currentUser = null;
-        targetUserEmail = null;
         authScreen.classList.remove('hidden');
-        targetScreen.classList.add('hidden');
-        chatScreen.classList.add('hidden');
+        appScreen.classList.add('hidden');
       }
     });
 
-    // 2. Login / Cadastro
+    // 2. Login e Cadastro
     btnLogin.addEventListener('click', async () => {
       const email = authEmail.value.trim();
       const password = authPassword.value;
@@ -340,8 +478,8 @@
         if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
           try {
             await createUserWithEmailAndPassword(auth, email, password);
-          } catch (createErr) {
-            authError.textContent = createErr.message;
+          } catch (err) {
+            authError.textContent = err.message;
           }
         } else {
           authError.textContent = error.message;
@@ -349,60 +487,87 @@
       }
     });
 
-    // Logout
     btnLogout.addEventListener('click', () => signOut(auth));
 
-    // 3. Gerar ID de sala único baseado nos dois e-mails
-    function getChatRoomId(email1, email2) {
-      const sorted = [email1.toLowerCase(), email2.toLowerCase()].sort();
-      return `${sorted[0]}_${sorted[1]}`.replace(/[^a-zA-Z0-9]/g, '_');
-    }
+    // 3. Adicionar Amigo à Lista (Salva no Firestore)
+    btnAddFriend.addEventListener('click', async () => {
+      const email = friendEmailInput.value.trim().toLowerCase();
+      if (!email) return;
 
-    // 4. Iniciar Chat com E-mail
-    btnStartChat.addEventListener('click', () => {
-      const destEmail = targetEmail.value.trim().toLowerCase();
-
-      if (!destEmail) return;
-      if (destEmail === currentUser.email.toLowerCase()) {
-        alert('Digite o e-mail de outra pessoa.');
+      if (email === currentUser.email.toLowerCase()) {
+        alert('Você não pode adicionar seu próprio e-mail.');
         return;
       }
 
-      targetUserEmail = destEmail;
-      targetScreen.classList.add('hidden');
-      chatScreen.classList.remove('hidden');
+      const friendKey = email.replace(/[^a-zA-Z0-9]/g, '_');
+      await setDoc(doc(db, "users", currentUser.uid, "friends", friendKey), {
+        email: email,
+        addedAt: serverTimestamp()
+      });
 
-      chatTargetTitle.textContent = targetUserEmail;
-      currentUserLabel.textContent = `Você: ${currentUser.email}`;
+      friendEmailInput.value = '';
+    });
+
+    // 4. Carregar Lista de Amigos em Tempo Real
+    function carregarAmigos() {
+      const friendsRef = collection(db, "users", currentUser.uid, "friends");
+      onSnapshot(friendsRef, (snapshot) => {
+        friendsList.innerHTML = '';
+        snapshot.forEach((docSnap) => {
+          const friend = docSnap.data();
+          const item = document.createElement('div');
+          item.classList.add('friend-item');
+          if (targetUserEmail === friend.email) item.classList.add('active');
+
+          item.innerHTML = `
+            <div class="friend-avatar">${friend.email[0].toUpperCase()}</div>
+            <div class="friend-email">${friend.email}</div>
+          `;
+
+          item.addEventListener('click', () => abrirChat(friend.email, item));
+          friendsList.appendChild(item);
+        });
+      });
+    }
+
+    // 5. Abrir Chat com Amigo
+    function abrirChat(email, element) {
+      document.querySelectorAll('.friend-item').forEach(el => el.classList.remove('active'));
+      if (element) element.classList.add('active');
+
+      targetUserEmail = email;
+      chatTargetTitle.textContent = email;
+      chatAvatar.textContent = email[0].toUpperCase();
+
+      noChatSelected.classList.add('hidden');
+      activeChat.classList.remove('hidden');
 
       carregarMensagens();
-    });
+    }
 
-    btnChangeChat.addEventListener('click', () => {
-      if (unsubscribeSnapshot) unsubscribeSnapshot();
-      targetUserEmail = null;
-      chatScreen.classList.add('hidden');
-      targetScreen.classList.remove('hidden');
-    });
+    // Gerador de ID da sala
+    function getRoomId(e1, e2) {
+      return [e1.toLowerCase(), e2.toLowerCase()].sort().join('_').replace(/[^a-zA-Z0-9]/g, '_');
+    }
 
-    // 5. Escutar mensagens em tempo real no Firestore
+    // 6. Escutar Mensagens do Chat Selecionado
     function carregarMensagens() {
       chatMessages.innerHTML = '';
-      const roomId = getChatRoomId(currentUser.email, targetUserEmail);
+      const roomId = getRoomId(currentUser.email, targetUserEmail);
 
       const q = query(
         collection(db, "chats", roomId, "messages"),
         orderBy("timestamp", "asc")
       );
 
-      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      if (unsubscribeMessages) unsubscribeMessages();
 
-      unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+      unsubscribeMessages = onSnapshot(q, (snapshot) => {
         chatMessages.innerHTML = '';
-        snapshot.forEach((doc) => {
-          const data = doc.data();
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
           const tipo = data.sender === currentUser.email ? 'sent' : 'received';
-          
+
           let hora = '';
           if (data.timestamp) {
             const date = data.timestamp.toDate();
@@ -411,8 +576,22 @@
 
           const msgDiv = document.createElement('div');
           msgDiv.classList.add('message', tipo);
+
+          let conteudo = '';
+          if (data.text) {
+            conteudo += `<div>${data.text}</div>`;
+          }
+
+          if (data.fileUrl) {
+            if (data.fileType && data.fileType.startsWith('image/')) {
+              conteudo += `<img src="${data.fileUrl}" alt="Imagem enviada" />`;
+            } else {
+              conteudo += `<a class="file-link" href="${data.fileUrl}" target="_blank" download>📄 ${data.fileName || 'Arquivo'}</a>`;
+            }
+          }
+
           msgDiv.innerHTML = `
-            ${data.text}
+            ${conteudo}
             <span class="time">${hora}</span>
           `;
 
@@ -423,22 +602,39 @@
       });
     }
 
-    // 6. Enviar mensagem
+    // 7. Enviar Mensagem (Texto e/ou Arquivo)
     chatForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+
       const text = messageInput.value.trim();
+      const file = fileInput.files[0];
 
-      if (text !== '' && currentUser && targetUserEmail) {
-        const roomId = getChatRoomId(currentUser.email, targetUserEmail);
-        messageInput.value = '';
+      if ((!text && !file) || !targetUserEmail) return;
 
-        await addDoc(collection(db, "chats", roomId, "messages"), {
-          text: text,
-          sender: currentUser.email,
-          recipient: targetUserEmail,
-          timestamp: serverTimestamp()
-        });
+      const roomId = getRoomId(currentUser.email, targetUserEmail);
+      messageInput.value = '';
+      let fileUrl = null;
+      let fileName = null;
+      let fileType = null;
+
+      if (file) {
+        fileName = file.name;
+        fileType = file.type;
+        const storageRef = ref(storage, `uploads/${roomId}/${Date.now()}_${file.name}`);
+        const uploadTask = await uploadBytes(storageRef, file);
+        fileUrl = await getDownloadURL(uploadTask.ref);
+        fileInput.value = '';
       }
+
+      await addDoc(collection(db, "chats", roomId, "messages"), {
+        text: text,
+        fileUrl: fileUrl,
+        fileName: fileName,
+        fileType: fileType,
+        sender: currentUser.email,
+        recipient: targetUserEmail,
+        timestamp: serverTimestamp()
+      });
     });
   </script>
 </body>
