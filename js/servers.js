@@ -1,6 +1,5 @@
 // js/servers.js
-// Criação de servidores, listagem, modal de informações/gerenciamento,
-// membros, convites e mensagens dentro de um servidor.
+// Gerenciamento completo de Servidores, Categorias, Canais e Configurações de Dono.
 
 import {
   collection, doc, addDoc, setDoc, getDoc, updateDoc, deleteDoc, query, orderBy,
@@ -56,7 +55,7 @@ import {
   btnTriggerColorEdit
 } from "./dom.js";
 
-/* ---------- Lista de servidores na sidebar ---------- */
+/* ---------- Carregar Servidores do Usuário ---------- */
 
 export function carregarServidores() {
   const serversRef = collection(db, "servers");
@@ -68,6 +67,8 @@ export function carregarServidores() {
       if (sData.members && sData.members.includes(state.currentUsername)) {
         const item = document.createElement('div');
         item.classList.add('server-item');
+        if (state.currentServerId === sId) item.classList.add('active');
+
         let avatarStyle = sData.iconUrl ? `style="background-image: url('${sData.iconUrl}')"` : '';
         let avatarContent = sData.iconUrl ? '' : sData.name[0].toUpperCase();
 
@@ -78,43 +79,146 @@ export function carregarServidores() {
             <div class="server-sub">${sData.members.length} membro(s)</div>
           </div>
         `;
-        item.addEventListener('click', () => abrirServidorChat(sId));
+        item.addEventListener('click', () => selecionarServidor(sId));
         serversList.appendChild(item);
       }
     });
   });
 }
 
-/* ---------- Abrir chat de um servidor ---------- */
+/* ---------- Seleção e Exibição do Servidor (Categorias e Canais) ---------- */
 
-export async function abrirServidorChat(serverId) {
+export async function selecionarServidor(serverId) {
   state.currentServerId = serverId;
   state.targetUsername = null;
   btnServerHeaderInfo.classList.remove('hidden');
 
-  const sSnap = await getDoc(doc(db, "servers", serverId));
-  if (!sSnap.exists()) return;
-  state.activeServerData = sSnap.data();
+  const serverDocRef = doc(db, "servers", serverId);
+  
+  if (state.unsubscribeServer) state.unsubscribeServer();
+  
+  state.unsubscribeServer = onSnapshot(serverDocRef, (sSnap) => {
+    if (!sSnap.exists()) return;
+    state.activeServerData = sSnap.data();
 
-  chatTargetTitle.textContent = state.activeServerData.name;
-  chatTargetHandle.textContent = `Servidor • ${state.activeServerData.members.length} membros`;
+    if (!state.activeServerData.categories) {
+      state.activeServerData.categories = [
+        {
+          id: "cat_default",
+          name: "GERAL",
+          collapsed: false,
+          channels: [{ id: "chan_general", name: "chat-geral", type: "chat" }]
+        }
+      ];
+      updateDoc(serverDocRef, { categories: state.activeServerData.categories });
+    }
 
-  if (state.activeServerData.iconUrl) {
+    renderizarArvoreServidor(serverId, state.activeServerData);
+  });
+}
+
+function renderizarArvoreServidor(serverId, serverData) {
+  let treeContainer = document.querySelector('#serverTreeContainer');
+  if (!treeContainer) {
+    treeContainer = document.createElement('div');
+    treeContainer.id = 'serverTreeContainer';
+    treeContainer.className = 'server-tree-container';
+    serversList.after(treeContainer);
+  }
+
+  treeContainer.innerHTML = '';
+
+  const serverHeader = document.createElement('div');
+  serverHeader.className = 'server-header-bar';
+  serverHeader.innerHTML = `
+    <span class="server-header-title">${serverData.name}</span>
+    <button class="btn btn-secondary btn-icon" id="btnConfigServer" title="Configurações">⚙️</button>
+  `;
+  serverHeader.querySelector('#btnConfigServer').addEventListener('click', abrirModalInfoServidor);
+  treeContainer.appendChild(serverHeader);
+
+  serverData.categories.forEach((category) => {
+    const group = document.createElement('div');
+    group.className = 'category-group';
+
+    const isCollapsed = category.collapsed || false;
+    const arrowChar = isCollapsed ? '>' : '<';
+
+    const headerBtn = document.createElement('button');
+    headerBtn.className = 'category-header-btn';
+    headerBtn.innerHTML = `
+      <div class="category-title-wrap">
+        <span>${category.name}</span>
+      </div>
+      <span class="category-arrow">${arrowChar}</span>
+    `;
+
+    const channelsList = document.createElement('div');
+    channelsList.className = `category-channels-list ${isCollapsed ? 'hidden' : ''}`;
+
+    headerBtn.addEventListener('click', async () => {
+      category.collapsed = !category.collapsed;
+      await updateDoc(doc(db, "servers", serverId), { categories: serverData.categories });
+    });
+
+    if (category.channels && category.channels.length > 0) {
+      category.channels.forEach((channel) => {
+        const chanBtn = document.createElement('button');
+        chanBtn.className = 'channel-btn';
+        if (state.currentChannelId === channel.id) chanBtn.classList.add('active');
+
+        chanBtn.innerHTML = `
+          <span class="channel-icon">#</span>
+          <span>${channel.name}</span>
+        `;
+
+        chanBtn.addEventListener('click', () => abrirCanalChat(serverId, channel));
+        channelsList.appendChild(chanBtn);
+      });
+    }
+
+    group.appendChild(headerBtn);
+    group.appendChild(channelsList);
+    treeContainer.appendChild(group);
+  });
+
+  if (!state.currentChannelId && serverData.categories[0]?.channels[0]) {
+    abrirCanalChat(serverId, serverData.categories[0].channels[0]);
+  }
+}
+
+/* ---------- Abrir Chat de um Canal Especifico ---------- */
+
+export async function abrirCanalChat(serverId, channel) {
+  state.currentServerId = serverId;
+  state.currentChannelId = channel.id;
+  state.currentChannelName = channel.name;
+  state.targetUsername = null;
+
+  chatTargetTitle.textContent = `# ${channel.name}`;
+  chatTargetHandle.textContent = `${state.activeServerData?.name || 'Servidor'} • Canal de Texto`;
+
+  if (state.activeServerData?.iconUrl) {
     chatAvatar.style.backgroundImage = `url(${state.activeServerData.iconUrl})`;
     chatAvatar.textContent = '';
   } else {
     chatAvatar.style.backgroundImage = 'none';
-    chatAvatar.textContent = state.activeServerData.name[0].toUpperCase();
+    chatAvatar.textContent = state.activeServerData?.name ? state.activeServerData.name[0].toUpperCase() : '#';
   }
 
   appScreen.classList.add('chat-open');
-  carregarMensagensServidor(serverId);
+  carregarMensagensCanal(serverId, channel.id);
 }
 
-function carregarMensagensServidor(serverId) {
+function carregarMensagensCanal(serverId, channelId) {
   chatMessages.replaceChildren();
   delete chatMessages.dataset.firstRender;
-  const q = query(collection(db, "servers", serverId, "messages"), orderBy("timestamp", "asc"));
+  
+  const q = query(
+    collection(db, "servers", serverId, "channels", channelId, "messages"),
+    orderBy("timestamp", "asc")
+  );
+
   if (state.unsubscribeMessages) state.unsubscribeMessages();
 
   state.unsubscribeMessages = onSnapshot(q, (snapshot) => {
@@ -122,7 +226,7 @@ function carregarMensagensServidor(serverId) {
   });
 }
 
-/* ---------- Criação de servidor ---------- */
+/* ---------- Criação de Servidor ---------- */
 
 function resetCreateServerIconPicker() {
   serverIconPickerLabel.innerHTML = `
@@ -137,7 +241,7 @@ function resetCreateServerIconPicker() {
 
 function initCreateServerModal() {
   btnOpenCreateServer.addEventListener('click', () => {
-    inputServerName.value = `Servidor de .${state.currentUsername}®`;
+    inputServerName.value = `Servidor de ${state.currentUsername}`;
     inputServerDesc.value = 'Bem-vindo ao nosso servidor!';
     state.tempServerAvatarBase64 = null;
     state.selectedBannerColor = '#000000';
@@ -166,6 +270,17 @@ function initCreateServerModal() {
     btnConfirmCreateServer.disabled = true;
     try {
       const serverRef = doc(collection(db, "servers"));
+      const initialCategories = [
+        {
+          id: "cat_" + Date.now(),
+          name: "GERAL",
+          collapsed: false,
+          channels: [
+            { id: "chan_" + Date.now(), name: "chat-geral", type: "chat" }
+          ]
+        }
+      ];
+
       await setDoc(serverRef, {
         name: name,
         description: desc,
@@ -174,6 +289,7 @@ function initCreateServerModal() {
         owner: state.currentUsername,
         inviteCode: inviteCode,
         members: [state.currentUsername],
+        categories: initialCategories,
         createdAt: serverTimestamp()
       });
 
@@ -191,7 +307,7 @@ function initCreateServerModal() {
   });
 }
 
-/* ---------- Modal de convidar amigos ---------- */
+/* ---------- Modal de Convites ---------- */
 
 function abrirModalConvidarAmigos(serverId, inviteCode) {
   txtInviteLink.textContent = `starcord.gg/${inviteCode}`;
@@ -199,7 +315,7 @@ function abrirModalConvidarAmigos(serverId, inviteCode) {
   inviteFriendsModal.classList.remove('hidden');
 }
 
-function carregarListaAmigosParaConvite() {
+function carregarListaAmigosParaConvite(serverId) {
   inviteFriendsListContainer.innerHTML = '';
   const colRef = collection(db, "users", state.currentUsername, "friends");
   onSnapshot(colRef, async (snapshot) => {
@@ -249,7 +365,7 @@ function carregarListaAmigosParaConvite() {
 function initInviteModal() {
   btnCloseInviteModal.addEventListener('click', () => {
     inviteFriendsModal.classList.add('hidden');
-    if (state.newlyCreatedServerId) abrirServidorChat(state.newlyCreatedServerId);
+    if (state.newlyCreatedServerId) selecionarServidor(state.newlyCreatedServerId);
   });
 
   btnCopyInviteLink.addEventListener('click', () => {
@@ -258,7 +374,7 @@ function initInviteModal() {
   });
 }
 
-/* ---------- Modal de informações / gerenciamento do servidor ---------- */
+/* ---------- Modal de Informações / Gerenciamento de Categorias do Dono ---------- */
 
 export async function abrirModalInfoServidor() {
   if (!state.currentServerId) return;
@@ -281,6 +397,8 @@ export async function abrirModalInfoServidor() {
   }
 
   const isOwner = state.activeServerData.owner === state.currentUsername;
+  renderizarPainelGerenciamentoDono(isOwner);
+
   if (isOwner) {
     btnSaveServerEdit.classList.remove('hidden');
     editServerNameInput.classList.remove('hidden');
@@ -316,7 +434,7 @@ export async function abrirModalInfoServidor() {
     let mAvatar = mProfile.avatarUrl ? `<div class="friend-avatar" style="width:28px;height:28px;background-image:url('${mProfile.avatarUrl}')"></div>` : `<div class="friend-avatar" style="width:28px;height:28px;font-size:11px;">${(mProfile.displayName||mUser)[0].toUpperCase()}</div>`;
     let actionHtml = '';
     if (isOwner && mUser !== state.currentUsername) {
-      actionHtml = `<button class="btn" style="background:#ff4d4d; padding:4px 8px; font-size:10px;" data-kick="${mUser}">Expulsar</button>`;
+      actionHtml = `<button class="btn" style="background:#ff4d4d; padding:4px 8px; font-size:10px;">Expulsar</button>`;
     } else if (mUser === state.activeServerData.owner) {
       actionHtml = `<span style="font-size:10px; color:var(--accent-red); font-weight:700;">DONO</span>`;
     }
@@ -342,6 +460,80 @@ export async function abrirModalInfoServidor() {
   }
 
   serverInfoModal.classList.remove('hidden');
+}
+
+function renderizarPainelGerenciamentoDono(isOwner) {
+  let managerContainer = document.querySelector('#ownerManagerSection');
+  if (managerContainer) managerContainer.remove();
+
+  if (!isOwner) return;
+
+  managerContainer = document.createElement('div');
+  managerContainer.id = 'ownerManagerSection';
+  managerContainer.className = 'owner-manager-section';
+
+  managerContainer.innerHTML = `
+    <div class="owner-manager-title">Gerenciar Categorias e Canais</div>
+    
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="newCatNameInput" placeholder="Nome da Categoria..." style="flex:1;" />
+      <button class="btn" id="btnCreateCategory" style="padding:6px 12px; font-size:11px;">+ Categoria</button>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+      <select id="selectCategoryForChannel" style="padding:8px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-main); border-radius:8px; font-size:12px;">
+      </select>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="newChannelNameInput" placeholder="Nome do Canal..." style="flex:1;" />
+        <button class="btn" id="btnCreateChannel" style="padding:6px 12px; font-size:11px;">+ Canal</button>
+      </div>
+    </div>
+  `;
+
+  serverInfoDescText.after(managerContainer);
+
+  const selectCat = managerContainer.querySelector('#selectCategoryForChannel');
+  const categories = state.activeServerData.categories || [];
+
+  selectCat.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+  managerContainer.querySelector('#btnCreateCategory').addEventListener('click', async () => {
+    const inputCat = managerContainer.querySelector('#newCatNameInput');
+    const catName = inputCat.value.trim();
+    if (!catName) return;
+
+    categories.push({
+      id: "cat_" + Date.now(),
+      name: catName.toUpperCase(),
+      collapsed: false,
+      channels: []
+    });
+
+    await updateDoc(doc(db, "servers", state.currentServerId), { categories });
+    showToast(`Categoria "${catName}" criada!`, 'success');
+    abrirModalInfoServidor();
+  });
+
+  managerContainer.querySelector('#btnCreateChannel').addEventListener('click', async () => {
+    const targetCatId = selectCat.value;
+    const inputChan = managerContainer.querySelector('#newChannelNameInput');
+    const chanName = inputChan.value.trim().toLowerCase().replace(/\s+/g, '-');
+
+    if (!targetCatId || !chanName) return;
+
+    const catIndex = categories.findIndex(c => c.id === targetCatId);
+    if (catIndex !== -1) {
+      categories[catIndex].channels.push({
+        id: "chan_" + Date.now(),
+        name: chanName,
+        type: "chat"
+      });
+
+      await updateDoc(doc(db, "servers", state.currentServerId), { categories });
+      showToast(`Canal "#${chanName}" criado!`, 'success');
+      abrirModalInfoServidor();
+    }
+  });
 }
 
 function initServerInfoModal() {
@@ -379,7 +571,7 @@ function initServerInfoModal() {
       });
       showToast('Servidor atualizado com sucesso!', 'success');
       serverInfoModal.classList.add('hidden');
-      abrirServidorChat(state.currentServerId);
+      selecionarServidor(state.currentServerId);
     } catch (err) {
       showToast('Erro ao atualizar servidor.');
     }
@@ -409,11 +601,10 @@ function initServerInfoModal() {
   btnServerHeaderInfo.addEventListener('click', abrirModalInfoServidor);
 }
 
-/* ---------- Inicialização geral do módulo ---------- */
+/* ---------- Inicialização Geral do Módulo ---------- */
 
 export function initServers() {
   initCreateServerModal();
   initInviteModal();
   initServerInfoModal();
 }
-
