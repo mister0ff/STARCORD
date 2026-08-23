@@ -1,119 +1,113 @@
 // js/dom.js
-// Todas as referências de elementos DOM usadas pelo sistema, centralizadas aqui.
-// Obs: os inputs de arquivo #serverAvatarFileInput dentro do modal de criar
-// servidor são recriados dinamicamente (innerHTML) em servers.js, então lá
-// eles são buscados de novo com document.getElementById na hora do uso.
+// Centralização dos seletores DOM da aplicação.
 
-export const splashScreen = document.getElementById('splashScreen');
-export const splashIcon = document.getElementById('splashIcon');
+export const splashScreen = document.querySelector('#splashScreen');
+export const splashIcon = document.querySelector('#splashIcon');
+export const authScreen = document.querySelector('#authScreen');
+export const appScreen = document.querySelector('.app-container');
 
-export const authScreen = document.getElementById('authScreen');
-export const appScreen = document.getElementById('appScreen');
-export const authTitle = document.getElementById('authTitle');
-export const authSub = document.getElementById('authSub');
-export const authUsername = document.getElementById('authUsername');
-export const authEmail = document.getElementById('authEmail');
-export const authPassword = document.getElementById('authPassword');
-export const authConfirmPassword = document.getElementById('authConfirmPassword');
-export const btnAuthSubmit = document.getElementById('btnAuthSubmit');
-export const btnToggleAuthMode = document.getElementById('btnToggleAuthMode');
-export const authError = document.getElementById('authError');
-export const groupUsername = document.getElementById('groupUsername');
-export const groupConfirmPassword = document.getElementById('groupConfirmPassword');
+export const authTitle = document.querySelector('#authTitle');
+export const authSub = document.querySelector('#authSub');
+export const authUsername = document.querySelector('#authUsername');
+export const authEmail = document.querySelector('#authEmail');
+export const authPassword = document.querySelector('#authPassword');
+export const authConfirmPassword = document.querySelector('#authConfirmPassword');
+export const btnAuthSubmit = document.querySelector('#btnAuthSubmit');
+export const btnToggleAuthMode = document.querySelector('#btnToggleAuthMode');
+export const authError = document.querySelector('#authError');
+export const groupUsername = document.querySelector('#groupUsername');
+export const groupConfirmPassword = document.querySelector('#groupConfirmPassword');
+export const btnLogout = document.querySelector('#btnLogout');
 
-export const userDisplayName = document.getElementById('userDisplayName');
-export const userHandle = document.getElementById('userHandle');
-export const userAvatarMain = document.getElementById('userAvatarMain');
-export const btnLogout = document.getElementById('btnLogout');
+export const serversList = document.querySelector('.servers-list');
+export const friendsList = document.querySelector('.friends-list');
 
-export const friendUsernameInput = document.getElementById('friendUsernameInput');
-export const btnAddFriend = document.getElementById('btnAddFriend');
-export const friendsList = document.getElementById('friendsList');
-export const serversList = document.getElementById('serversList');
+export const chatArea = document.querySelector('.chat-area');
+export const chatTargetTitle = document.querySelector('#chatTargetTitle') || document.querySelector('.chat-user-target .user-display-name');
+export const chatTargetHandle = document.querySelector('#chatTargetHandle') || document.querySelector('.chat-user-target .user-handle');
+export const chatAvatar = document.querySelector('#chatAvatar') || document.querySelector('.chat-user-target .user-avatar-main');
+export const chatMessages = document.querySelector('.chat-messages');
+export const chatForm = document.querySelector('#chatForm') || document.querySelector('.chat-footer');
+export const messageInput = document.querySelector('#messageInput') || document.querySelector('.chat-footer input');
+export const fileInput = document.querySelector('#fileInput');
+export const btnBack = document.querySelector('#btnBack') || document.querySelector('.chat-back-btn');
 
-export const btnBack = document.getElementById('btnBack');
-export const chatTargetTitle = document.getElementById('chatTargetTitle');
-export const chatTargetHandle = document.getElementById('chatTargetHandle');
-export const chatAvatar = document.getElementById('chatAvatar');
-export const chatMessages = document.getElementById('chatMessages');
-export const chatForm = document.getElementById('chatForm');
-export const messageInput = document.getElementById('messageInput');
-export const fileInput = document.getElementById('fileInput');
-export const btnServerHeaderInfo = document.getElementById('btnServerHeaderInfo');
+export const btnServerHeaderInfo = document.querySelector('#btnServerHeaderInfo');
+export const btnOpenCreateServer = document.querySelector('#btnOpenCreateServer');
+export const createServerModal = document.querySelector('#createServerModal');
+export const btnCloseCreateServer = document.querySelector('#btnCloseCreateServer');
+export const serverIconPickerLabel = document.querySelector('#serverIconPickerLabel');
+export const inputServerName = document.querySelector('#inputServerName');
+export const inputServerDesc = document.querySelector('#inputServerDesc');
+export const btnConfirmCreateServer = document.querySelector('#btnConfirmCreateServer');
+export const previewColorCreate = document.querySelector('#previewColorCreate');
+export const txtColorCreate = document.querySelector('#txtColorCreate');
+export const btnTriggerColorCreate = document.querySelector('#btnTriggerColorCreate');
 
-export const toastContainer = document.getElementById('toastContainer');
+export const inviteFriendsModal = document.querySelector('#inviteFriendsModal');
+export const btnCloseInviteModal = document.querySelector('#btnCloseInviteModal');
+export const txtInviteLink = document.querySelector('#txtInviteLink');
+export const btnCopyInviteLink = document.querySelector('#btnCopyInviteLink');
+export const inviteFriendsListContainer = document.querySelector('#inviteFriendsListContainer');
 
-export const profileModal = document.getElementById('profileModal');
-export const btnOpenSelfProfile = document.getElementById('btnOpenSelfProfile');
-export const btnOpenTargetProfile = document.getElementById('btnOpenTargetProfile');
-export const btnCloseProfileModal = document.getElementById('btnCloseProfileModal');
-export const btnSaveProfile = document.getElementById('btnSaveProfile');
-export const profileModalTitle = document.getElementById('profileModalTitle');
+export const serverInfoModal = document.querySelector('#serverInfoModal');
+export const btnCloseServerInfoModal = document.querySelector('#btnCloseServerInfoModal');
+export const serverInfoModalTitle = document.querySelector('#serverInfoModalTitle');
+export const serverInfoModalAvatar = document.querySelector('#serverInfoModalAvatar');
+export const serverInfoName = document.querySelector('#serverInfoName');
+export const serverInfoOwner = document.querySelector('#serverInfoOwner');
+export const modalServerInviteLink = document.querySelector('#modalServerInviteLink');
+export const btnModalCopyLink = document.querySelector('#btnModalCopyLink');
+export const serverInfoDescText = document.querySelector('#serverInfoDescText');
+export const serverMembersListContainer = document.querySelector('#serverMembersListContainer');
+export const btnOpenInviteMore = document.querySelector('#btnOpenInviteMore');
+export const btnLeaveOrDeleteServer = document.querySelector('#btnLeaveOrDeleteServer');
 
-export const modalAvatarPreview = document.getElementById('modalAvatarPreview');
-export const modalAvatarEditOverlay = document.getElementById('modalAvatarEditOverlay');
-export const avatarFileInput = document.getElementById('avatarFileInput');
+export const editServerNameInput = document.querySelector('#editServerNameInput');
+export const editServerDescInput = document.querySelector('#editServerDescInput');
+export const btnSaveServerEdit = document.querySelector('#btnSaveServerEdit');
+export const editBannerColorSection = document.querySelector('#editBannerColorSection');
+export const previewColorEdit = document.querySelector('#previewColorEdit');
+export const txtColorEdit = document.txtColorEdit || document.querySelector('#txtColorEdit');
+export const btnTriggerColorEdit = document.querySelector('#btnTriggerColorEdit');
 
-export const editDisplayName = document.getElementById('editDisplayName');
-export const viewDisplayName = document.getElementById('viewDisplayName');
-export const editPronouns = document.getElementById('editPronouns');
-export const viewPronouns = document.getElementById('viewPronouns');
-export const editBio = document.getElementById('editBio');
-export const viewBio = document.getElementById('viewBio');
+export const profileModal = document.querySelector('#profileModal');
+export const btnOpenSelfProfile = document.querySelector('#btnOpenSelfProfile');
+export const btnOpenTargetProfile = document.querySelector('#btnOpenTargetProfile');
+export const btnCloseProfileModal = document.querySelector('#btnCloseProfileModal');
+export const btnSaveProfile = document.querySelector('#btnSaveProfile');
+export const profileModalTitle = document.querySelector('#profileModalTitle');
+export const modalAvatarPreview = document.querySelector('#modalAvatarPreview');
+export const modalAvatarEditOverlay = document.querySelector('#modalAvatarEditOverlay');
+export const avatarFileInput = document.querySelector('#avatarFileInput');
+export const editDisplayName = document.querySelector('#editDisplayName');
+export const viewDisplayName = document.querySelector('#viewDisplayName');
+export const editPronouns = document.querySelector('#editPronouns');
+export const viewPronouns = document.querySelector('#viewPronouns');
+export const editBio = document.querySelector('#editBio');
+export const viewBio = document.querySelector('#viewBio');
+export const userDisplayName = document.querySelector('#userDisplayName');
+export const userHandle = document.querySelector('#userHandle');
+export const userAvatarMain = document.querySelector('#userAvatarMain');
 
-export const btnOpenCreateServer = document.getElementById('btnOpenCreateServer');
-export const createServerModal = document.getElementById('createServerModal');
-export const btnCloseCreateServer = document.getElementById('btnCloseCreateServer');
-export const serverIconPickerLabel = document.getElementById('serverIconPickerLabel');
-export const inputServerName = document.getElementById('inputServerName');
-export const inputServerDesc = document.getElementById('inputServerDesc');
-export const btnConfirmCreateServer = document.getElementById('btnConfirmCreateServer');
+export const friendUsernameInput = document.querySelector('#friendUsernameInput');
+export const btnAddFriend = document.querySelector('#btnAddFriend');
 
-export const inviteFriendsModal = document.getElementById('inviteFriendsModal');
-export const btnCloseInviteModal = document.getElementById('btnCloseInviteModal');
-export const txtInviteLink = document.getElementById('txtInviteLink');
-export const btnCopyInviteLink = document.getElementById('btnCopyInviteLink');
-export const inviteFriendsListContainer = document.getElementById('inviteFriendsListContainer');
+export const cropModal = document.querySelector('#cropModal');
+export const cropCanvas = document.querySelector('#cropCanvas');
+export const cropContainer = document.querySelector('#cropContainer');
+export const cropZoom = document.querySelector('#cropZoom');
+export const zoomVal = document.querySelector('#zoomVal');
+export const btnCancelCrop = document.querySelector('#btnCancelCrop');
+export const btnApplyCrop = document.querySelector('#btnApplyCrop');
 
-export const serverInfoModal = document.getElementById('serverInfoModal');
-export const btnCloseServerInfoModal = document.getElementById('btnCloseServerInfoModal');
-export const serverInfoModalTitle = document.getElementById('serverInfoModalTitle');
-export const serverInfoModalAvatar = document.getElementById('serverInfoModalAvatar');
-export const serverInfoName = document.getElementById('serverInfoName');
-export const serverInfoOwner = document.getElementById('serverInfoOwner');
-export const modalServerInviteLink = document.getElementById('modalServerInviteLink');
-export const btnModalCopyLink = document.getElementById('btnModalCopyLink');
-export const serverInfoDescText = document.getElementById('serverInfoDescText');
-export const serverMembersListContainer = document.getElementById('serverMembersListContainer');
-export const btnOpenInviteMore = document.getElementById('btnOpenInviteMore');
-export const btnLeaveOrDeleteServer = document.getElementById('btnLeaveOrDeleteServer');
-export const editServerNameInput = document.getElementById('editServerNameInput');
-export const editServerDescInput = document.getElementById('editServerDescInput');
-export const btnSaveServerEdit = document.getElementById('btnSaveServerEdit');
-export const editBannerColorSection = document.getElementById('editBannerColorSection');
+export const customColorPickerModal = document.querySelector('#customColorPickerModal');
+export const pickerHexInput = document.querySelector('#pickerHexInput');
+export const pickerSatBox = document.querySelector('#pickerSatBox');
+export const pickerSatBg = document.querySelector('#pickerSatBg');
+export const pickerSatPointer = document.querySelector('#pickerSatPointer');
+export const pickerHueBar = document.querySelector('#pickerHueBar');
+export const pickerHueThumb = document.querySelector('#pickerHueThumb');
+export const btnSelectColor = document.querySelector('#btnSelectColor');
 
-export const cropModal = document.getElementById('cropModal');
-export const cropCanvas = document.getElementById('cropCanvas');
-export const cropContainer = document.getElementById('cropContainer');
-export const cropZoom = document.getElementById('cropZoom');
-export const zoomVal = document.getElementById('zoomVal');
-export const btnCancelCrop = document.getElementById('btnCancelCrop');
-export const btnApplyCrop = document.getElementById('btnApplyCrop');
-
-export const customColorPickerModal = document.getElementById('customColorPickerModal');
-export const pickerHexInput = document.getElementById('pickerHexInput');
-export const pickerSatBox = document.getElementById('pickerSatBox');
-export const pickerSatBg = document.getElementById('pickerSatBg');
-export const pickerSatPointer = document.getElementById('pickerSatPointer');
-export const pickerHueBar = document.getElementById('pickerHueBar');
-export const pickerHueThumb = document.getElementById('pickerHueThumb');
-export const btnSelectColor = document.getElementById('btnSelectColor');
-
-export const btnTriggerColorCreate = document.getElementById('btnTriggerColorCreate');
-export const previewColorCreate = document.getElementById('previewColorCreate');
-export const txtColorCreate = document.getElementById('txtColorCreate');
-
-export const btnTriggerColorEdit = document.getElementById('btnTriggerColorEdit');
-export const previewColorEdit = document.getElementById('previewColorEdit');
-export const txtColorEdit = document.getElementById('txtColorEdit');
-
+export const toastContainer = document.querySelector('.toast-container') || document.body;
