@@ -685,6 +685,32 @@ input:focus, textarea:focus {
   flex-shrink: 0;
 }
 
+/* Modal da Loja */
+.store-banner-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  width: 100%;
+}
+.store-banner-preview {
+  width: 50px;
+  height: 30px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.store-banner-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-left: 12px;
+}
+
 /* Modal do Color Picker */
 .color-picker-modal {
   position: fixed;
@@ -872,6 +898,8 @@ input:focus, textarea:focus {
   height: 100px;
   background: linear-gradient(135deg, var(--accent-red), #400000);
   position: relative;
+  background-size: cover;
+  background-position: center;
 }
 
 .profile-avatar-wrapper {
