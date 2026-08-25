@@ -46,6 +46,7 @@ let activeServerData = null;
 let unsubscribeMessages = null;
 let tempAvatarBase64 = null;
 let tempServerAvatarBase64 = null;
+let selectedBannerUrl = 'default';
 let isLoginMode = false;
 const profileCache = {};
 
@@ -68,7 +69,7 @@ async function getProfileCached(username) {
       return profileCache[username];
     }
   } catch (e) {}
-  return { displayName: username, avatarUrl: '' };
+  return { displayName: username, avatarUrl: '', bannerUrl: 'default' };
 }
 
 // Splash Screen
@@ -117,6 +118,10 @@ const userDisplayName = document.getElementById('userDisplayName');
 const userHandle = document.getElementById('userHandle');
 const userAvatarMain = document.getElementById('userAvatarMain');
 const btnLogout = document.getElementById('btnLogout');
+const btnOpenStore = document.getElementById('btnOpenStore');
+const storeModal = document.getElementById('storeModal');
+const btnCloseStoreModal = document.getElementById('btnCloseStoreModal');
+const profileBannerPreview = document.getElementById('profileBannerPreview');
 
 const friendUsernameInput = document.getElementById('friendUsernameInput');
 const btnAddFriend = document.getElementById('btnAddFriend');
@@ -477,7 +482,7 @@ btnAuthSubmit.addEventListener('click', async () => {
 
       await setDoc(doc(db, "profiles", uName), {
         username: uName, displayName: uName, email: email,
-        uid: userCred.user.uid, pronouns: '', bio: '', avatarUrl: ''
+        uid: userCred.user.uid, pronouns: '', bio: '', avatarUrl: '', bannerUrl: 'default'
       });
 
       await setDoc(doc(db, "users_map", userCred.user.uid), {
@@ -495,6 +500,34 @@ btnAuthSubmit.addEventListener('click', async () => {
 
 btnLogout.addEventListener('click', (e) => { e.stopPropagation(); signOut(auth); });
 
+btnOpenStore.addEventListener('click', (e) => { e.stopPropagation(); storeModal.classList.remove('hidden'); });
+btnCloseStoreModal.addEventListener('click', () => { storeModal.classList.add('hidden'); });
+
+window.setBannerChoice = async function(bannerType) {
+  selectedBannerUrl = bannerType;
+  try {
+    await setDoc(doc(db, "profiles", currentUsername), { bannerUrl: bannerType }, { merge: true });
+    profileCache[currentUsername] = null;
+    aplicarBannerNaVisualizacao(bannerType, profileBannerPreview);
+    storeModal.classList.add('hidden');
+    showToast('Banner atualizado com sucesso!', 'success');
+  } catch(e) {
+    showToast('Erro ao atualizar banner.');
+  }
+};
+
+function aplicarBannerNaVisualizacao(bannerVal, el) {
+  if (!el) return;
+  if (bannerVal === 'default' || !bannerVal) {
+    el.style.backgroundImage = 'none';
+    el.style.background = 'linear-gradient(135deg, var(--accent-red), #400000)';
+  } else {
+    el.style.backgroundImage = `url('${bannerVal}')`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+  }
+}
+
 btnBack.addEventListener('click', () => {
   appScreen.classList.remove('chat-open');
   targetUsername = null;
@@ -510,6 +543,9 @@ async function carregarMeuPerfil() {
       const data = docSnap.data();
       userDisplayName.textContent = data.displayName || currentUsername;
       userHandle.textContent = `@${currentUsername}`;
+      selectedBannerUrl = data.bannerUrl || 'default';
+      aplicarBannerNaVisualizacao(selectedBannerUrl, profileBannerPreview);
+
       if (data.avatarUrl) {
         userAvatarMain.style.backgroundImage = `url(${data.avatarUrl})`;
         userAvatarMain.textContent = '';
@@ -588,6 +624,8 @@ btnOpenSelfProfile.addEventListener('click', async () => {
   editDisplayName.value = data.displayName || '';
   editPronouns.value = data.pronouns || '';
   editBio.value = data.bio || '';
+  aplicarBannerNaVisualizacao(data.bannerUrl || 'default', profileBannerPreview);
+
   if (data.avatarUrl) {
     modalAvatarPreview.style.backgroundImage = `url(${data.avatarUrl})`;
     modalAvatarPreview.textContent = '';
@@ -615,6 +653,8 @@ btnOpenTargetProfile.addEventListener('click', async () => {
   viewDisplayName.textContent = data.displayName || targetUsername;
   viewPronouns.textContent = data.pronouns || 'Não informado';
   viewBio.textContent = data.bio || 'Sem biografia.';
+  aplicarBannerNaVisualizacao(data.bannerUrl || 'default', profileBannerPreview);
+
   if (data.avatarUrl) {
     modalAvatarPreview.style.backgroundImage = `url(${data.avatarUrl})`;
     modalAvatarPreview.textContent = '';
@@ -633,7 +673,8 @@ btnSaveProfile.addEventListener('click', async () => {
     const updateData = {
       displayName: editDisplayName.value.trim() || currentUsername,
       pronouns: editPronouns.value.trim(),
-      bio: editBio.value.trim()
+      bio: editBio.value.trim(),
+      bannerUrl: selectedBannerUrl
     };
     if (tempAvatarBase64) updateData.avatarUrl = tempAvatarBase64;
     await setDoc(doc(db, "profiles", currentUsername), updateData, { merge: true });
