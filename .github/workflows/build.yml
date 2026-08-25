@@ -28,6 +28,9 @@ jobs:
       - name: Inicializar o ambiente Android do Capacitor
         run: npx cap add android
 
+      - name: Copiar arquivos web para o projeto nativo
+        run: npx cap copy android
+
       - name: Compilar APK (Gradle Debug)
         run: |
           cd android
@@ -38,4 +41,3 @@ jobs:
         with:
           name: meu-aplicativo-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
