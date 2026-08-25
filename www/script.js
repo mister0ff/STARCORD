@@ -22,7 +22,8 @@ import {
   arrayUnion,
   arrayRemove,
   where,
-  getDocs
+  getDocs,
+  increment
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -49,6 +50,11 @@ let tempServerAvatarBase64 = null;
 let selectedBannerUrl = 'default';
 let isLoginMode = false;
 const profileCache = {};
+
+// Controle de digitação
+let typingTimeout = null;
+let isTyping = false;
+let typingListenersUnsubscribe = null;
 
 let selectedBannerColor = '#000000';
 let editSelectedBannerColor = '#000000';
@@ -139,6 +145,13 @@ const fileInput = document.getElementById('fileInput');
 const btnServerHeaderInfo = document.getElementById('btnServerHeaderInfo');
 
 const toastContainer = document.getElementById('toastContainer');
+
+// Elementos de Moedas
+const coinsDisplay = document.getElementById('coinsDisplay');
+const coinsValue = document.getElementById('coinsValue');
+
+// Elementos de Digitação
+const typingIndicator = document.getElementById('typingIndicator');
 
 // Modais DOM
 const profileModal = document.getElementById('profileModal');
@@ -443,6 +456,7 @@ onAuthStateChanged(auth, async (user) => {
       currentUsername = user.email.split('@')[0];
     }
     await carregarMeuPerfil();
+    await carregarMoedas();
     carregarAmigos();
     carregarServidores();
   } else {
@@ -483,6 +497,11 @@ btnAuthSubmit.addEventListener('click', async () => {
       await setDoc(doc(db, "profiles", uName), {
         username: uName, displayName: uName, email: email,
         uid: userCred.user.uid, pronouns: '', bio: '', avatarUrl: '', bannerUrl: 'default'
+      });
+
+      // Criar documento de moedas para o usuário
+      await setDoc(doc(db, "coins", uName), {
+        money: 0
       });
 
       await setDoc(doc(db, "users_map", userCred.user.uid), {
@@ -543,8 +562,164 @@ btnBack.addEventListener('click', () => {
   currentServerId = null;
   activeServerData = null;
   btnServerHeaderInfo.classList.add('hidden');
+  // Limpar status de digitação
+  if (typingListenersUnsubscribe) {
+    typingListenersUnsubscribe();
+    typingListenersUnsubscribe = null;
+  }
+  typingIndicator.style.display = 'none';
 });
 
+// ==================== SISTEMA DE MOEDAS ====================
+async function carregarMoedas() {
+  if (!currentUsername) return;
+  try {
+    const coinRef = doc(db, "coins", currentUsername);
+    const coinSnap = await getDoc(coinRef);
+    if (coinSnap.exists()) {
+      const data = coinSnap.data();
+      coinsValue.textContent = data.money || 0;
+    } else {
+      await setDoc(coinRef, { money: 0 });
+      coinsValue.textContent = '0';
+    }
+
+    // Atualização em tempo real
+    onSnapshot(coinRef, (docSnap) => {
+      if (docSnap.exists()) {
+        coinsValue.textContent = docSnap.data().money || 0;
+      }
+    });
+  } catch (e) {
+    console.error('Erro ao carregar moedas:', e);
+  }
+}
+
+// Função para adicionar moedas (pode ser chamada em eventos como mensagens enviadas)
+async function adicionarMoedas(quantidade = 1) {
+  if (!currentUsername) return;
+  try {
+    const coinRef = doc(db, "coins", currentUsername);
+    await updateDoc(coinRef, {
+      money: increment(quantidade)
+    });
+  } catch (e) {
+    console.error('Erro ao adicionar moedas:', e);
+  }
+}
+
+// ==================== SISTEMA DE DIGITAÇÃO ====================
+function setupTypingSystem() {
+  const chatInput = messageInput;
+
+  chatInput.addEventListener('input', () => {
+    if (!targetUsername && !currentServerId) return;
+    
+    // Enviar status de digitação
+    const chatId = targetUsername 
+      ? [currentUsername, targetUsername].sort().join('_') 
+      : `server_${currentServerId}`;
+
+    const typingRef = doc(db, "typing_status", chatId);
+
+    if (chatInput.value.trim().length > 0) {
+      if (!isTyping) {
+        isTyping = true;
+        setDoc(typingRef, {
+          user: currentUsername,
+          timestamp: serverTimestamp()
+        });
+      }
+      // Reset timeout
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        isTyping = false;
+        setDoc(typingRef, {
+          user: currentUsername,
+          timestamp: serverTimestamp()
+        });
+      }, 3000);
+    } else {
+      if (isTyping) {
+        isTyping = false;
+        clearTimeout(typingTimeout);
+        setDoc(typingRef, {
+          user: currentUsername,
+          timestamp: serverTimestamp()
+        });
+      }
+    }
+  });
+
+  // Listen para status de digitação de outros usuários
+  function startListeningTyping() {
+    if (typingListenersUnsubscribe) {
+      typingListenersUnsubscribe();
+      typingListenersUnsubscribe = null;
+    }
+
+    if (!targetUsername && !currentServerId) return;
+
+    const chatId = targetUsername 
+      ? [currentUsername, targetUsername].sort().join('_') 
+      : `server_${currentServerId}`;
+
+    const typingRef = doc(db, "typing_status", chatId);
+    
+    typingListenersUnsubscribe = onSnapshot(typingRef, (docSnap) => {
+      if (!docSnap.exists()) {
+        typingIndicator.style.display = 'none';
+        return;
+      }
+
+      const data = docSnap.data();
+      const typingUser = data.user;
+      
+      // Não mostrar se for o próprio usuário
+      if (typingUser === currentUsername) {
+        typingIndicator.style.display = 'none';
+        return;
+      }
+
+      // Verificar se está digitando (timestamp recente)
+      const now = Date.now();
+      const typingTime = data.timestamp?.toDate?.()?.getTime() || 0;
+      const isRecent = (now - typingTime) < 5000;
+
+      if (isRecent && typingUser) {
+        // Buscar nome de exibição do usuário
+        getProfileCached(typingUser).then(profile => {
+          const displayName = profile.displayName || typingUser;
+          typingIndicator.textContent = `${displayName} está digitando...`;
+          typingIndicator.style.display = 'inline';
+        });
+      } else {
+        typingIndicator.style.display = 'none';
+      }
+    });
+  }
+
+  // Observar mudanças de chat
+  const originalAbrirChat = abrirChatAmigo;
+  const originalAbrirServer = abrirServidorChat;
+
+  window.abrirChatAmigo = async function(friendUser, pData) {
+    await originalAbrirChat(friendUser, pData);
+    startListeningTyping();
+  };
+
+  window.abrirServidorChat = async function(serverId) {
+    await originalAbrirServer(serverId);
+    startListeningTyping();
+  };
+
+  // Iniciar listening quando o chat for aberto
+  if (targetUsername || currentServerId) {
+    startListeningTyping();
+  }
+}
+
+// ==================== PERFIL ====================
 async function carregarMeuPerfil() {
   const profileRef = doc(db, "profiles", currentUsername);
   onSnapshot(profileRef, (docSnap) => {
@@ -698,6 +873,7 @@ btnSaveProfile.addEventListener('click', async () => {
   }
 });
 
+// ==================== SERVIDORES ====================
 btnOpenCreateServer.addEventListener('click', () => {
   inputServerName.value = `Servidor de .${currentUsername}®`;
   inputServerDesc.value = 'Bem-vindo ao nosso servidor!';
@@ -812,6 +988,8 @@ async function carregarListaAmigosParaConvite(serverId) {
           timestamp: serverTimestamp()
         });
         showToast(`Convite enviado para @${fUser}!`, 'success');
+        // Adiciona moedas ao convidar
+        await adicionarMoedas(2);
       });
       inviteFriendsListContainer.appendChild(row);
     }
@@ -867,6 +1045,7 @@ async function abrirServidorChat(serverId) {
 
   appScreen.classList.add('chat-open');
   carregarMensagensServidor(serverId);
+  setupTypingSystem();
 }
 
 async function processarTextoComEmbeds(text, bodyDiv) {
@@ -931,6 +1110,8 @@ async function processarTextoComEmbeds(text, bodyDiv) {
                 members: arrayUnion(currentUsername)
               });
               showToast(`Você entrou em ${sData.name}!`, 'success');
+              // Adiciona moedas ao entrar no servidor
+              await adicionarMoedas(5);
             }
             abrirServidorChat(sId);
           });
@@ -1170,7 +1351,7 @@ btnLeaveOrDeleteServer.addEventListener('click', async () => {
   }
 });
 
-// Adicionar Amigos
+// ==================== AMIGOS ====================
 btnAddFriend.addEventListener('click', async () => {
   const friendUser = cleanUsername(friendUsernameInput.value);
   if (!friendUser) return;
@@ -1186,6 +1367,8 @@ btnAddFriend.addEventListener('click', async () => {
 
     friendUsernameInput.value = '';
     showToast(`@${friendUser} adicionado!`, 'success');
+    // Adiciona moedas ao adicionar amigo
+    await adicionarMoedas(3);
   } catch (err) {
     showToast('Erro ao adicionar amigo: ' + err.message);
   } finally {
@@ -1238,6 +1421,7 @@ async function abrirChatAmigo(friendUser, pData) {
 
   appScreen.classList.add('chat-open');
   carregarMensagensChatPrivado(friendUser);
+  setupTypingSystem();
 }
 
 function carregarMensagensChatPrivado(friendUser) {
@@ -1307,12 +1491,21 @@ function carregarMensagensChatPrivado(friendUser) {
   });
 }
 
-// Envio de Mensagens
+// ==================== ENVIO DE MENSAGENS ====================
 chatForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = messageInput.value.trim();
   if (!text) return;
   messageInput.value = '';
+
+  // Limpar status de digitação ao enviar
+  if (targetUsername) {
+    const chatId = [currentUsername, targetUsername].sort().join('_');
+    await setDoc(doc(db, "typing_status", chatId), {
+      user: currentUsername,
+      timestamp: serverTimestamp()
+    });
+  }
 
   const myProfile = await getProfileCached(currentUsername);
 
@@ -1325,6 +1518,8 @@ chatForm.addEventListener('submit', async (e) => {
       senderAvatar: myProfile.avatarUrl || '',
       timestamp: serverTimestamp()
     });
+    // Adiciona moedas ao enviar mensagem em servidor
+    await adicionarMoedas(1);
   } else if (targetUsername) {
     const roomId = [currentUsername, targetUsername].sort().join('_');
     await addDoc(collection(db, "chats", roomId, "messages"), {
@@ -1335,10 +1530,11 @@ chatForm.addEventListener('submit', async (e) => {
       senderAvatar: myProfile.avatarUrl || '',
       timestamp: serverTimestamp()
     });
+    // Adiciona moedas ao enviar mensagem privada
+    await adicionarMoedas(1);
   }
 });
 
-// Upload de Imagem/Arquivo no Chat
 fileInput.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -1356,6 +1552,7 @@ fileInput.addEventListener('change', async (e) => {
         senderAvatar: myProfile.avatarUrl || '',
         timestamp: serverTimestamp()
       });
+      await adicionarMoedas(1);
     } else if (targetUsername) {
       const roomId = [currentUsername, targetUsername].sort().join('_');
       await addDoc(collection(db, "chats", roomId, "messages"), {
@@ -1366,9 +1563,12 @@ fileInput.addEventListener('change', async (e) => {
         senderAvatar: myProfile.avatarUrl || '',
         timestamp: serverTimestamp()
       });
+      await adicionarMoedas(1);
     }
   };
   reader.readAsDataURL(file);
   e.target.value = '';
 });
 
+// Inicializa sistema de digitação
+setupTypingSystem();
