@@ -174,9 +174,9 @@
     </div>
   </div>
 
-  <!-- Modal da Loja de Banners -->
+  <!-- Modal da Loja de Banners (Com suporte a Links e GIFs animados) -->
   <div id="storeModal" class="modal-overlay hidden">
-    <div class="profile-modal" style="max-width: 380px;">
+    <div class="profile-modal" style="max-width: 400px;">
       <div class="modal-top-bar">
         <button class="btn btn-secondary btn-icon" id="btnCloseStoreModal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -185,8 +185,19 @@
         <div></div>
       </div>
       <div class="server-create-body" style="gap: 12px;">
-        <p style="color: var(--text-muted); font-size: 13px; text-align: center;">Escolha um banner gratuito para o seu perfil!</p>
+        <p style="color: var(--text-muted); font-size: 13px; text-align: center;">Escolha um banner pronto ou insira o link direto de um GIF/Imagem!</p>
         
+        <!-- Campo para Banner por Link / GIF -->
+        <div class="input-group" style="width: 100%;">
+          <div class="field-label">Banner por Link (GIF ou Imagem)</div>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="customBannerUrlInput" placeholder="https://exemplo.com/banner.gif" autocomplete="off" />
+            <button class="btn" style="padding: 0 14px; font-size: 11px;" onclick="window.aplicarBannerCustomizadoPorLink()">Usar</button>
+          </div>
+        </div>
+
+        <div style="width: 100%; height: 1px; background: var(--border-color); margin: 4px 0;"></div>
+
         <div class="store-banner-option" data-banner="default">
           <div class="store-banner-preview" style="background: linear-gradient(135deg, #e50914, #400000);"></div>
           <div class="store-banner-info">
@@ -411,4 +422,3 @@
   <script type="module" src="script.js"></script>
 </body>
 </html>
-
