@@ -64,7 +64,12 @@
             <span class="user-handle" id="userHandle">@user</span>
           </div>
         </div>
-        <div style="display: flex; gap: 4px;">
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <!-- Saldo de Moedas -->
+          <div class="coins-display" id="coinsDisplay">
+            <span class="coin-icon">⭐</span>
+            <span id="coinsValue">0</span>
+          </div>
           <button class="btn btn-secondary btn-icon" id="btnOpenStore" title="Loja de Banners">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
           </button>
@@ -110,6 +115,8 @@
             <div class="user-details">
               <h3 id="chatTargetTitle">@amigo</h3>
               <span class="user-handle" id="chatTargetHandle">Clique para ver o perfil</span>
+              <!-- Indicador de digitação -->
+              <span class="typing-indicator" id="typingIndicator" style="display:none; font-size:11px; color:var(--accent-red);">...</span>
             </div>
           </div>
         </div>
@@ -181,7 +188,7 @@
         <button class="btn btn-secondary btn-icon" id="btnCloseStoreModal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
-        <h3>Loja de Banners</h3>
+        <h3>⭐ Nossa Loja</h3>
         <div></div>
       </div>
       <div class="server-create-body" style="gap: 12px;">
@@ -198,49 +205,44 @@
 
         <div style="width: 100%; height: 1px; background: var(--border-color); margin: 4px 0;"></div>
 
-        <div class="store-banner-option" data-banner="default">
-          <div class="store-banner-preview" style="background: linear-gradient(135deg, #e50914, #400000);"></div>
+        <!-- Banner 1 - Floresta Vermelha -->
+        <div class="store-banner-option" data-banner="https://cdn.discordapp.com/attachments/1462160007893356677/1541238475582345348/dee986b92033c942037f1772a6ff6df5.gif?ex=6a8ed7ef&is=6a8d866f&hm=0e2f70957e8ba5a22cac34df24c457403ec55344fb5ddb2b4cfb4c2be56059fc&">
+          <div class="store-banner-preview" style="background-image: url('https://cdn.discordapp.com/attachments/1462160007893356677/1541238475582345348/dee986b92033c942037f1772a6ff6df5.gif?ex=6a8ed7ef&is=6a8d866f&hm=0e2f70957e8ba5a22cac34df24c457403ec55344fb5ddb2b4cfb4c2be56059fc&');"></div>
           <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Padrão Vermelho</span>
+            <span style="font-weight: 700; font-size: 13px;">Floresta Vermelha</span>
             <span style="font-size: 11px; color: #23c268;">Grátis</span>
           </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('default')">Usar</button>
+          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('https://cdn.discordapp.com/attachments/1462160007893356677/1541238475582345348/dee986b92033c942037f1772a6ff6df5.gif?ex=6a8ed7ef&is=6a8d866f&hm=0e2f70957e8ba5a22cac34df24c457403ec55344fb5ddb2b4cfb4c2be56059fc&')">Usar</button>
         </div>
 
-        <div class="store-banner-option" data-banner="banner.png">
-          <div class="store-banner-preview" style="background-image: url('banner.png');"></div>
+        <!-- Banner 2 - Floresta Verde -->
+        <div class="store-banner-option" data-banner="https://cdn.discordapp.com/attachments/1462160007893356677/1541239154334113902/409da4dc00fca0b271407d734c59ea7f.gif?ex=6a8ed891&is=6a8d8711&hm=92a8497443652690e52270a1cc60bdc69d6bc5fbe2ea0ce5ba14da479ef0009c&">
+          <div class="store-banner-preview" style="background-image: url('https://cdn.discordapp.com/attachments/1462160007893356677/1541239154334113902/409da4dc00fca0b271407d734c59ea7f.gif?ex=6a8ed891&is=6a8d8711&hm=92a8497443652690e52270a1cc60bdc69d6bc5fbe2ea0ce5ba14da479ef0009c&');"></div>
           <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Banner 1</span>
+            <span style="font-weight: 700; font-size: 13px;">Floresta Verde</span>
             <span style="font-size: 11px; color: #23c268;">Grátis</span>
           </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('banner.png')">Usar</button>
+          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('https://cdn.discordapp.com/attachments/1462160007893356677/1541239154334113902/409da4dc00fca0b271407d734c59ea7f.gif?ex=6a8ed891&is=6a8d8711&hm=92a8497443652690e52270a1cc60bdc69d6bc5fbe2ea0ce5ba14da479ef0009c&')">Usar</button>
         </div>
 
-        <div class="store-banner-option" data-banner="banner2.png">
-          <div class="store-banner-preview" style="background-image: url('banner2.png');"></div>
+        <!-- Banner 3 - Garota Anime -->
+        <div class="store-banner-option" data-banner="https://cdn.discordapp.com/attachments/1462160007893356677/1541239160445075508/c11cfeda5da203e1ac5038dc08c8e617.jpg?ex=6a8ed892&is=6a8d8712&hm=16961bbaaa1f6ab7d130df7258627e7e8e0d1b27f38338e595e5af4b314bbf8f&">
+          <div class="store-banner-preview" style="background-image: url('https://cdn.discordapp.com/attachments/1462160007893356677/1541239160445075508/c11cfeda5da203e1ac5038dc08c8e617.jpg?ex=6a8ed892&is=6a8d8712&hm=16961bbaaa1f6ab7d130df7258627e7e8e0d1b27f38338e595e5af4b314bbf8f&');"></div>
           <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Banner 2</span>
+            <span style="font-weight: 700; font-size: 13px;">Garota Anime</span>
             <span style="font-size: 11px; color: #23c268;">Grátis</span>
           </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('banner2.png')">Usar</button>
+          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('https://cdn.discordapp.com/attachments/1462160007893356677/1541239160445075508/c11cfeda5da203e1ac5038dc08c8e617.jpg?ex=6a8ed892&is=6a8d8712&hm=16961bbaaa1f6ab7d130df7258627e7e8e0d1b27f38338e595e5af4b314bbf8f&')">Usar</button>
         </div>
 
-        <div class="store-banner-option" data-banner="banner3.png">
-          <div class="store-banner-preview" style="background-image: url('banner3.png');"></div>
+        <!-- Banner 4 - Garota Anime 2 -->
+        <div class="store-banner-option" data-banner="https://cdn.discordapp.com/attachments/1462160007893356677/1541239169848844339/8f7a17a41f56dcfd339f0ad4a473ab36.jpg?ex=6a8ed894&is=6a8d8714&hm=8958a8dfcdd5f24da59c30f04975ee7ea7664359c305dde0b45e0cb69ca96d67&">
+          <div class="store-banner-preview" style="background-image: url('https://cdn.discordapp.com/attachments/1462160007893356677/1541239169848844339/8f7a17a41f56dcfd339f0ad4a473ab36.jpg?ex=6a8ed894&is=6a8d8714&hm=8958a8dfcdd5f24da59c30f04975ee7ea7664359c305dde0b45e0cb69ca96d67&');"></div>
           <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Banner 3</span>
+            <span style="font-weight: 700; font-size: 13px;">Garota Anime 2</span>
             <span style="font-size: 11px; color: #23c268;">Grátis</span>
           </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('banner3.png')">Usar</button>
-        </div>
-
-        <div class="store-banner-option" data-banner="banner4.png">
-          <div class="store-banner-preview" style="background-image: url('banner4.png');"></div>
-          <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Banner 4</span>
-            <span style="font-size: 11px; color: #23c268;">Grátis</span>
-          </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('banner4.png')">Usar</button>
+          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('https://cdn.discordapp.com/attachments/1462160007893356677/1541239169848844339/8f7a17a41f56dcfd339f0ad4a473ab36.jpg?ex=6a8ed894&is=6a8d8714&hm=8958a8dfcdd5f24da59c30f04975ee7ea7664359c305dde0b45e0cb69ca96d67&')">Usar</button>
         </div>
       </div>
     </div>
