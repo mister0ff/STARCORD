@@ -516,6 +516,15 @@ window.setBannerChoice = async function(bannerType) {
   }
 };
 
+window.aplicarBannerCustomizadoPorLink = async function() {
+  const customUrl = document.getElementById('customBannerUrlInput').value.trim();
+  if (!customUrl) {
+    showToast('Cole o link do banner/GIF.');
+    return;
+  }
+  await window.setBannerChoice(customUrl);
+};
+
 function aplicarBannerNaVisualizacao(bannerVal, el) {
   if (!el) return;
   if (bannerVal === 'default' || !bannerVal) {
