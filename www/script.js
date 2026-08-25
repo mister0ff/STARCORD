@@ -23,7 +23,8 @@ import {
   arrayRemove,
   where,
   getDocs,
-  increment
+  increment,
+  runTransaction
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -55,9 +56,15 @@ const profileCache = {};
 let typingTimeout = null;
 let isTyping = false;
 let typingListenersUnsubscribe = null;
+let typingIndicatorArea = document.getElementById('typingIndicatorArea');
+let typingIndicatorText = document.getElementById('typingIndicatorText');
 
 let selectedBannerColor = '#000000';
 let editSelectedBannerColor = '#000000';
+let roleSelectedColor = '#ffffff';
+
+// Usuário alvo para moderação
+let targetUserForModeration = null;
 
 function cleanUsername(input) {
   if (!input) return "";
@@ -78,7 +85,46 @@ async function getProfileCached(username) {
   return { displayName: username, avatarUrl: '', bannerUrl: 'default' };
 }
 
-// Splash Screen
+async function getUserRoles(serverId, username) {
+  try {
+    const snap = await getDoc(doc(db, "servers", serverId, "members", username));
+    if (snap.exists()) {
+      return snap.data().roles || [];
+    }
+  } catch (e) {}
+  return [];
+}
+
+async function getUserRolesWithData(serverId, username) {
+  const roleIds = await getUserRoles(serverId, username);
+  if (!roleIds.length) return [];
+  
+  const roles = [];
+  for (const roleId of roleIds) {
+    const roleSnap = await getDoc(doc(db, "servers", serverId, "roles", roleId));
+    if (roleSnap.exists()) {
+      roles.push({ id: roleId, ...roleSnap.data() });
+    }
+  }
+  return roles;
+}
+
+async function userHasPermission(serverId, username, permission) {
+  const roles = await getUserRolesWithData(serverId, username);
+  const serverData = await getDoc(doc(db, "servers", serverId));
+  const isOwner = serverData.exists() && serverData.data().owner === username;
+  
+  if (isOwner) return true;
+  
+  for (const role of roles) {
+    if (role.permissions && role.permissions[permission] === true) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ==================== SPLASH ====================
 let splashFinished = false;
 let authChecked = false;
 const splashScreen = document.getElementById('splashScreen');
@@ -105,7 +151,7 @@ function revelarTelaCorreta() {
   }
 }
 
-// Elementos DOM Autenticação
+// ==================== DOM ELEMENTOS ====================
 const authScreen = document.getElementById('authScreen');
 const appScreen = document.getElementById('appScreen');
 const authTitle = document.getElementById('authTitle');
@@ -128,6 +174,8 @@ const btnOpenStore = document.getElementById('btnOpenStore');
 const storeModal = document.getElementById('storeModal');
 const btnCloseStoreModal = document.getElementById('btnCloseStoreModal');
 const profileBannerPreview = document.getElementById('profileBannerPreview');
+const storeItemsContainer = document.getElementById('storeItemsContainer');
+const storeCoinsBalance = document.getElementById('storeCoinsBalance');
 
 const friendUsernameInput = document.getElementById('friendUsernameInput');
 const btnAddFriend = document.getElementById('btnAddFriend');
@@ -145,34 +193,32 @@ const fileInput = document.getElementById('fileInput');
 const btnServerHeaderInfo = document.getElementById('btnServerHeaderInfo');
 
 const toastContainer = document.getElementById('toastContainer');
-
-// Elementos de Moedas
-const coinsDisplay = document.getElementById('coinsDisplay');
 const coinsValue = document.getElementById('coinsValue');
 
-// Elementos de Digitação
-const typingIndicator = document.getElementById('typingIndicator');
-
-// Modais DOM
+// Modais
 const profileModal = document.getElementById('profileModal');
 const btnOpenSelfProfile = document.getElementById('btnOpenSelfProfile');
 const btnOpenTargetProfile = document.getElementById('btnOpenTargetProfile');
 const btnCloseProfileModal = document.getElementById('btnCloseProfileModal');
 const btnSaveProfile = document.getElementById('btnSaveProfile');
 const profileModalTitle = document.getElementById('profileModalTitle');
-
 const modalAvatarPreview = document.getElementById('modalAvatarPreview');
 const modalAvatarEditOverlay = document.getElementById('modalAvatarEditOverlay');
 const avatarFileInput = document.getElementById('avatarFileInput');
-
 const editDisplayName = document.getElementById('editDisplayName');
 const viewDisplayName = document.getElementById('viewDisplayName');
 const editPronouns = document.getElementById('editPronouns');
 const viewPronouns = document.getElementById('viewPronouns');
 const editBio = document.getElementById('editBio');
 const viewBio = document.getElementById('viewBio');
+const userRolesSection = document.getElementById('userRolesSection');
+const userRolesList = document.getElementById('userRolesList');
+const moderationActions = document.getElementById('moderationActions');
+const btnKickUser = document.getElementById('btnKickUser');
+const btnBanUser = document.getElementById('btnBanUser');
+const btnAssignRole = document.getElementById('btnAssignRole');
 
-// Modais Servidores DOM
+// Servidores
 const btnOpenCreateServer = document.getElementById('btnOpenCreateServer');
 const createServerModal = document.getElementById('createServerModal');
 const btnCloseCreateServer = document.getElementById('btnCloseCreateServer');
@@ -204,8 +250,32 @@ const editServerNameInput = document.getElementById('editServerNameInput');
 const editServerDescInput = document.getElementById('editServerDescInput');
 const btnSaveServerEdit = document.getElementById('btnSaveServerEdit');
 const editBannerColorSection = document.getElementById('editBannerColorSection');
+const serverRolesList = document.getElementById('serverRolesList');
+const btnCreateRole = document.getElementById('btnCreateRole');
 
-// Modal Crop DOM
+// Role Modal
+const roleModal = document.getElementById('roleModal');
+const btnCloseRoleModal = document.getElementById('btnCloseRoleModal');
+const roleModalTitle = document.getElementById('roleModalTitle');
+const inputRoleName = document.getElementById('inputRoleName');
+const btnSaveRole = document.getElementById('btnSaveRole');
+const btnDeleteRole = document.getElementById('btnDeleteRole');
+const previewColorRole = document.getElementById('previewColorRole');
+const txtColorRole = document.getElementById('txtColorRole');
+const btnTriggerColorRole = document.getElementById('btnTriggerColorRole');
+const permSendMessage = document.getElementById('permSendMessage');
+const permMentionRoles = document.getElementById('permMentionRoles');
+const permTextEditor = document.getElementById('permTextEditor');
+const permManageRoles = document.getElementById('permManageRoles');
+const permKick = document.getElementById('permKick');
+const permBan = document.getElementById('permBan');
+
+// Assign Role Modal
+const assignRoleModal = document.getElementById('assignRoleModal');
+const btnCloseAssignRoleModal = document.getElementById('btnCloseAssignRoleModal');
+const assignRoleList = document.getElementById('assignRoleList');
+
+// Crop
 const cropModal = document.getElementById('cropModal');
 const cropCanvas = document.getElementById('cropCanvas');
 const cropContainer = document.getElementById('cropContainer');
@@ -221,194 +291,7 @@ let isDragging = false;
 let dragStart = { x: 0, y: 0 };
 let activeCropTarget = 'user';
 
-// Seletor de Cores Customizado
-let pickerH = 0, pickerS = 0, pickerV = 0;
-let currentPickerCallback = null;
-
-const customColorPickerModal = document.getElementById('customColorPickerModal');
-const pickerHexInput = document.getElementById('pickerHexInput');
-const pickerSatBox = document.getElementById('pickerSatBox');
-const pickerSatBg = document.getElementById('pickerSatBg');
-const pickerSatPointer = document.getElementById('pickerSatPointer');
-const pickerHueBar = document.getElementById('pickerHueBar');
-const pickerHueThumb = document.getElementById('pickerHueThumb');
-const btnSelectColor = document.getElementById('btnSelectColor');
-
-function hsvToRgb(h, s, v) {
-  let r, g, b;
-  let i = Math.floor(h / 60) % 6;
-  let f = h / 60 - Math.floor(h / 60);
-  let p = v * (1 - s);
-  let q = v * (1 - f * s);
-  let t = v * (1 - (1 - f) * s);
-  switch (i) {
-    case 0: r = v; g = t; b = p; break;
-    case 1: r = q; g = v; b = p; break;
-    case 2: r = p; g = v; b = t; break;
-    case 3: r = p; g = q; b = v; break;
-    case 4: r = t; g = p; b = v; break;
-    case 5: r = v; g = p; b = q; break;
-  }
-  return {
-    r: Math.round(r * 255),
-    g: Math.round(g * 255),
-    b: Math.round(b * 255)
-  };
-}
-
-function rgbToHex(r, g, b) {
-  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
-}
-
-function hexToHsv(hex) {
-  hex = hex.replace('#', '');
-  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-  if (hex.length !== 6) return { h: 0, s: 0, v: 0 };
-  let r = parseInt(hex.substring(0, 2), 16) / 255;
-  let g = parseInt(hex.substring(2, 4), 16) / 255;
-  let b = parseInt(hex.substring(4, 6), 16) / 255;
-
-  let max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h, s, v = max;
-  let d = max - min;
-  s = max === 0 ? 0 : d / max;
-
-  if (max === min) {
-    h = 0;
-  } else {
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return { h: h * 360, s: s, v: v };
-}
-
-function openCustomColorPicker(initialColor, onSelectCallback) {
-  currentPickerCallback = onSelectCallback;
-  const hsv = hexToHsv(initialColor || '#000000');
-  pickerH = hsv.h;
-  pickerS = hsv.s;
-  pickerV = hsv.v;
-  customColorPickerModal.classList.remove('hidden');
-  requestAnimationFrame(() => {
-    updatePickerUI();
-  });
-}
-
-function updatePickerUI(updateInput = true) {
-  const rgbBase = hsvToRgb(pickerH, 1, 1);
-  pickerSatBg.style.backgroundColor = `rgb(${rgbBase.r}, ${rgbBase.g}, ${rgbBase.b})`;
-
-  const satRect = pickerSatBox.getBoundingClientRect();
-  const pointerX = pickerS * (satRect.width || 260);
-  const pointerY = (1 - pickerV) * (satRect.height || 240);
-  pickerSatPointer.style.left = `${pointerX}px`;
-  pickerSatPointer.style.top = `${pointerY}px`;
-
-  const hueRect = pickerHueBar.getBoundingClientRect();
-  const hueX = (pickerH / 360) * (hueRect.width || 260);
-  pickerHueThumb.style.left = `${hueX}px`;
-  pickerHueThumb.style.backgroundColor = `rgb(${rgbBase.r}, ${rgbBase.g}, ${rgbBase.b})`;
-
-  const finalRgb = hsvToRgb(pickerH, pickerS, pickerV);
-  const hex = rgbToHex(finalRgb.r, finalRgb.g, finalRgb.b);
-  if (updateInput) {
-    pickerHexInput.value = hex;
-  }
-}
-
-let isSatDragging = false;
-function handleSatPointer(e) {
-  const rect = pickerSatBox.getBoundingClientRect();
-  let x = e.clientX - rect.left;
-  let y = e.clientY - rect.top;
-  x = Math.max(0, Math.min(x, rect.width));
-  y = Math.max(0, Math.min(y, rect.height));
-
-  pickerS = x / rect.width;
-  pickerV = 1 - (y / rect.height);
-  updatePickerUI();
-}
-
-pickerSatBox.addEventListener('pointerdown', (e) => {
-  isSatDragging = true;
-  pickerSatBox.setPointerCapture(e.pointerId);
-  handleSatPointer(e);
-});
-
-pickerSatBox.addEventListener('pointermove', (e) => {
-  if (isSatDragging) handleSatPointer(e);
-});
-
-pickerSatBox.addEventListener('pointerup', (e) => {
-  isSatDragging = false;
-});
-
-let isHueDragging = false;
-function handleHuePointer(e) {
-  const rect = pickerHueBar.getBoundingClientRect();
-  let x = e.clientX - rect.left;
-  x = Math.max(0, Math.min(x, rect.width));
-
-  pickerH = (x / rect.width) * 360;
-  if (pickerH >= 360) pickerH = 359.9;
-  updatePickerUI();
-}
-
-pickerHueBar.addEventListener('pointerdown', (e) => {
-  isHueDragging = true;
-  pickerHueBar.setPointerCapture(e.pointerId);
-  handleHuePointer(e);
-});
-
-pickerHueBar.addEventListener('pointermove', (e) => {
-  if (isHueDragging) handleHuePointer(e);
-});
-
-pickerHueBar.addEventListener('pointerup', (e) => {
-  isHueDragging = false;
-});
-
-pickerHexInput.addEventListener('input', (e) => {
-  let val = e.target.value.trim();
-  if (!val.startsWith('#')) val = '#' + val;
-  if (/^#([0-9A-F]{3}){1,2}$/i.test(val)) {
-    const hsv = hexToHsv(val);
-    pickerH = hsv.h;
-    pickerS = hsv.s;
-    pickerV = hsv.v;
-    updatePickerUI(false);
-  }
-});
-
-btnSelectColor.addEventListener('click', () => {
-  const finalRgb = hsvToRgb(pickerH, pickerS, pickerV);
-  const hex = rgbToHex(finalRgb.r, finalRgb.g, finalRgb.b);
-  if (currentPickerCallback) {
-    currentPickerCallback(hex);
-  }
-  customColorPickerModal.classList.add('hidden');
-});
-
-document.getElementById('btnTriggerColorCreate').addEventListener('click', () => {
-  openCustomColorPicker(selectedBannerColor, (hex) => {
-    selectedBannerColor = hex;
-    document.getElementById('previewColorCreate').style.backgroundColor = hex;
-    document.getElementById('txtColorCreate').textContent = hex;
-  });
-});
-
-document.getElementById('btnTriggerColorEdit').addEventListener('click', () => {
-  openCustomColorPicker(editSelectedBannerColor, (hex) => {
-    editSelectedBannerColor = hex;
-    document.getElementById('previewColorEdit').style.backgroundColor = hex;
-    document.getElementById('txtColorEdit').textContent = hex;
-  });
-});
-
+// ==================== TOAST ====================
 function showToast(message, type = 'info') {
   const el = document.createElement('div');
   el.className = 'toast' + (type === 'success' ? ' success' : '');
@@ -417,6 +300,7 @@ function showToast(message, type = 'info') {
   setTimeout(() => el.remove(), 4000);
 }
 
+// ==================== AUTENTICAÇÃO ====================
 [authUsername, friendUsernameInput].forEach(input => {
   input.addEventListener('input', (e) => {
     e.target.value = cleanUsername(e.target.value);
@@ -426,7 +310,6 @@ function showToast(message, type = 'info') {
 btnToggleAuthMode.addEventListener('click', () => {
   isLoginMode = !isLoginMode;
   authError.textContent = '';
-
   if (isLoginMode) {
     authTitle.textContent = "Entrar no Starcord";
     authSub.textContent = "Digite seus dados para acessar";
@@ -481,7 +364,6 @@ btnAuthSubmit.addEventListener('click', async () => {
   }
 
   btnAuthSubmit.disabled = true;
-
   try {
     if (isLoginMode) {
       await signInWithEmailAndPassword(auth, email, password);
@@ -499,11 +381,7 @@ btnAuthSubmit.addEventListener('click', async () => {
         uid: userCred.user.uid, pronouns: '', bio: '', avatarUrl: '', bannerUrl: 'default'
       });
 
-      // Criar documento de moedas para o usuário
-      await setDoc(doc(db, "coins", uName), {
-        money: 0
-      });
-
+      await setDoc(doc(db, "coins", uName), { money: 10 });
       await setDoc(doc(db, "users_map", userCred.user.uid), {
         username: uName, email: email
       });
@@ -519,31 +397,153 @@ btnAuthSubmit.addEventListener('click', async () => {
 
 btnLogout.addEventListener('click', (e) => { e.stopPropagation(); signOut(auth); });
 
-btnOpenStore.addEventListener('click', (e) => { e.stopPropagation(); storeModal.classList.remove('hidden'); });
-btnCloseStoreModal.addEventListener('click', () => { storeModal.classList.add('hidden'); });
-
-window.setBannerChoice = async function(bannerType) {
-  selectedBannerUrl = bannerType;
+// ==================== MOEDAS ====================
+async function carregarMoedas() {
+  if (!currentUsername) return;
   try {
-    await setDoc(doc(db, "profiles", currentUsername), { bannerUrl: bannerType }, { merge: true });
-    profileCache[currentUsername] = null;
-    aplicarBannerNaVisualizacao(bannerType, profileBannerPreview);
-    storeModal.classList.add('hidden');
-    showToast('Banner atualizado com sucesso!', 'success');
-  } catch(e) {
-    showToast('Erro ao atualizar banner.');
+    const coinRef = doc(db, "coins", currentUsername);
+    const coinSnap = await getDoc(coinRef);
+    if (coinSnap.exists()) {
+      coinsValue.textContent = coinSnap.data().money || 0;
+    } else {
+      await setDoc(coinRef, { money: 10 });
+      coinsValue.textContent = '10';
+    }
+    onSnapshot(coinRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const val = docSnap.data().money || 0;
+        coinsValue.textContent = val;
+        if (storeCoinsBalance) storeCoinsBalance.textContent = val;
+      }
+    });
+  } catch (e) {
+    console.error('Erro ao carregar moedas:', e);
   }
-};
+}
 
-window.aplicarBannerCustomizadoPorLink = async function() {
-  const customUrl = document.getElementById('customBannerUrlInput').value.trim();
-  if (!customUrl) {
-    showToast('Cole o link do banner/GIF.');
+async function comprarItem(itemId, price) {
+  if (!currentUsername) return false;
+  try {
+    const coinRef = doc(db, "coins", currentUsername);
+    await runTransaction(db, async (transaction) => {
+      const coinSnap = await transaction.get(coinRef);
+      if (!coinSnap.exists()) throw new Error("Saldo não encontrado");
+      const balance = coinSnap.data().money || 0;
+      if (balance < price) throw new Error("Saldo insuficiente");
+      transaction.update(coinRef, { money: increment(-price) });
+      
+      // Adicionar à lista de compras do usuário
+      const purchasesRef = doc(db, "purchases", currentUsername);
+      const purchasesSnap = await transaction.get(purchasesRef);
+      if (purchasesSnap.exists()) {
+        transaction.update(purchasesRef, {
+          items: arrayUnion(itemId)
+        });
+      } else {
+        transaction.set(purchasesRef, {
+          items: [itemId]
+        });
+      }
+    });
+    showToast('Item comprado com sucesso!', 'success');
+    return true;
+  } catch (e) {
+    showToast(e.message || 'Erro ao comprar item');
+    return false;
+  }
+}
+
+async function verificarCompra(itemId) {
+  if (!currentUsername) return false;
+  try {
+    const snap = await getDoc(doc(db, "purchases", currentUsername));
+    if (snap.exists()) {
+      const items = snap.data().items || [];
+      return items.includes(itemId);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// ==================== LOJA ====================
+async function carregarLoja() {
+  if (!currentUsername) return;
+  
+  // Atualizar saldo
+  const coinSnap = await getDoc(doc(db, "coins", currentUsername));
+  if (coinSnap.exists()) {
+    storeCoinsBalance.textContent = coinSnap.data().money || 0;
+  }
+
+  // Carregar itens da loja do Firebase
+  const itemsRef = collection(db, "store_items");
+  const itemsSnap = await getDocs(query(itemsRef, orderBy("price", "asc")));
+  
+  storeItemsContainer.innerHTML = '';
+  
+  if (itemsSnap.empty) {
+    storeItemsContainer.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:13px;">Nenhum item disponível no momento.</div>';
     return;
   }
-  await window.setBannerChoice(customUrl);
-};
 
+  // Verificar itens comprados
+  const purchasesSnap = await getDoc(doc(db, "purchases", currentUsername));
+  const purchasedItems = purchasesSnap.exists() ? (purchasesSnap.data().items || []) : [];
+
+  for (const docSnap of itemsSnap.docs) {
+    const item = docSnap.data();
+    const itemId = docSnap.id;
+    const isOwned = purchasedItems.includes(itemId);
+
+    const div = document.createElement('div');
+    div.className = 'store-banner-option' + (isOwned ? ' owned' : '');
+    
+    const previewStyle = item.imageUrl ? `background-image: url('${item.imageUrl}')` : 'background: linear-gradient(135deg, #333, #666)';
+    
+    div.innerHTML = `
+      <div class="store-banner-preview" style="${previewStyle}"></div>
+      <div class="store-banner-info">
+        <span style="font-weight:700;font-size:13px;">${item.name || 'Item'}</span>
+        <span class="price">${isOwned ? '✅ Adquirido' : `${item.price || 0} ⭐`}</span>
+      </div>
+      <button class="btn" style="padding:6px 12px;font-size:11px;" data-itemid="${itemId}" data-price="${item.price || 0}" ${isOwned ? 'disabled' : ''}>
+        ${isOwned ? 'Usar' : 'Comprar'}
+      </button>
+    `;
+
+    const btn = div.querySelector('button');
+    if (!isOwned) {
+      btn.addEventListener('click', async () => {
+        const price = parseInt(btn.dataset.price);
+        const success = await comprarItem(itemId, price);
+        if (success) {
+          carregarLoja();
+        }
+      });
+    } else {
+      btn.addEventListener('click', async () => {
+        // Aplicar banner
+        const itemSnap = await getDoc(doc(db, "store_items", itemId));
+        if (itemSnap.exists()) {
+          const itemData = itemSnap.data();
+          await setDoc(doc(db, "profiles", currentUsername), { 
+            bannerUrl: itemData.imageUrl 
+          }, { merge: true });
+          profileCache[currentUsername] = null;
+          aplicarBannerNaVisualizacao(itemData.imageUrl, profileBannerPreview);
+          showToast('Banner aplicado!', 'success');
+          storeModal.classList.add('hidden');
+        }
+      });
+    }
+
+    storeItemsContainer.appendChild(div);
+  }
+}
+
+// ==================== BANNERS ====================
 function aplicarBannerNaVisualizacao(bannerVal, el) {
   if (!el) return;
   if (bannerVal === 'default' || !bannerVal) {
@@ -553,169 +553,6 @@ function aplicarBannerNaVisualizacao(bannerVal, el) {
     el.style.backgroundImage = `url('${bannerVal}')`;
     el.style.backgroundSize = 'cover';
     el.style.backgroundPosition = 'center';
-  }
-}
-
-btnBack.addEventListener('click', () => {
-  appScreen.classList.remove('chat-open');
-  targetUsername = null;
-  currentServerId = null;
-  activeServerData = null;
-  btnServerHeaderInfo.classList.add('hidden');
-  // Limpar status de digitação
-  if (typingListenersUnsubscribe) {
-    typingListenersUnsubscribe();
-    typingListenersUnsubscribe = null;
-  }
-  typingIndicator.style.display = 'none';
-});
-
-// ==================== SISTEMA DE MOEDAS ====================
-async function carregarMoedas() {
-  if (!currentUsername) return;
-  try {
-    const coinRef = doc(db, "coins", currentUsername);
-    const coinSnap = await getDoc(coinRef);
-    if (coinSnap.exists()) {
-      const data = coinSnap.data();
-      coinsValue.textContent = data.money || 0;
-    } else {
-      await setDoc(coinRef, { money: 0 });
-      coinsValue.textContent = '0';
-    }
-
-    // Atualização em tempo real
-    onSnapshot(coinRef, (docSnap) => {
-      if (docSnap.exists()) {
-        coinsValue.textContent = docSnap.data().money || 0;
-      }
-    });
-  } catch (e) {
-    console.error('Erro ao carregar moedas:', e);
-  }
-}
-
-// Função para adicionar moedas (pode ser chamada em eventos como mensagens enviadas)
-async function adicionarMoedas(quantidade = 1) {
-  if (!currentUsername) return;
-  try {
-    const coinRef = doc(db, "coins", currentUsername);
-    await updateDoc(coinRef, {
-      money: increment(quantidade)
-    });
-  } catch (e) {
-    console.error('Erro ao adicionar moedas:', e);
-  }
-}
-
-// ==================== SISTEMA DE DIGITAÇÃO ====================
-function setupTypingSystem() {
-  const chatInput = messageInput;
-
-  chatInput.addEventListener('input', () => {
-    if (!targetUsername && !currentServerId) return;
-    
-    // Enviar status de digitação
-    const chatId = targetUsername 
-      ? [currentUsername, targetUsername].sort().join('_') 
-      : `server_${currentServerId}`;
-
-    const typingRef = doc(db, "typing_status", chatId);
-
-    if (chatInput.value.trim().length > 0) {
-      if (!isTyping) {
-        isTyping = true;
-        setDoc(typingRef, {
-          user: currentUsername,
-          timestamp: serverTimestamp()
-        });
-      }
-      // Reset timeout
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => {
-        isTyping = false;
-        setDoc(typingRef, {
-          user: currentUsername,
-          timestamp: serverTimestamp()
-        });
-      }, 3000);
-    } else {
-      if (isTyping) {
-        isTyping = false;
-        clearTimeout(typingTimeout);
-        setDoc(typingRef, {
-          user: currentUsername,
-          timestamp: serverTimestamp()
-        });
-      }
-    }
-  });
-
-  // Listen para status de digitação de outros usuários
-  function startListeningTyping() {
-    if (typingListenersUnsubscribe) {
-      typingListenersUnsubscribe();
-      typingListenersUnsubscribe = null;
-    }
-
-    if (!targetUsername && !currentServerId) return;
-
-    const chatId = targetUsername 
-      ? [currentUsername, targetUsername].sort().join('_') 
-      : `server_${currentServerId}`;
-
-    const typingRef = doc(db, "typing_status", chatId);
-    
-    typingListenersUnsubscribe = onSnapshot(typingRef, (docSnap) => {
-      if (!docSnap.exists()) {
-        typingIndicator.style.display = 'none';
-        return;
-      }
-
-      const data = docSnap.data();
-      const typingUser = data.user;
-      
-      // Não mostrar se for o próprio usuário
-      if (typingUser === currentUsername) {
-        typingIndicator.style.display = 'none';
-        return;
-      }
-
-      // Verificar se está digitando (timestamp recente)
-      const now = Date.now();
-      const typingTime = data.timestamp?.toDate?.()?.getTime() || 0;
-      const isRecent = (now - typingTime) < 5000;
-
-      if (isRecent && typingUser) {
-        // Buscar nome de exibição do usuário
-        getProfileCached(typingUser).then(profile => {
-          const displayName = profile.displayName || typingUser;
-          typingIndicator.textContent = `${displayName} está digitando...`;
-          typingIndicator.style.display = 'inline';
-        });
-      } else {
-        typingIndicator.style.display = 'none';
-      }
-    });
-  }
-
-  // Observar mudanças de chat
-  const originalAbrirChat = abrirChatAmigo;
-  const originalAbrirServer = abrirServidorChat;
-
-  window.abrirChatAmigo = async function(friendUser, pData) {
-    await originalAbrirChat(friendUser, pData);
-    startListeningTyping();
-  };
-
-  window.abrirServidorChat = async function(serverId) {
-    await originalAbrirServer(serverId);
-    startListeningTyping();
-  };
-
-  // Iniciar listening quando o chat for aberto
-  if (targetUsername || currentServerId) {
-    startListeningTyping();
   }
 }
 
@@ -741,6 +578,7 @@ async function carregarMeuPerfil() {
   });
 }
 
+// ==================== CROP ====================
 avatarFileInput.addEventListener('change', (e) => { activeCropTarget = 'user'; handleImageSelect(e); });
 serverAvatarFileInput.addEventListener('change', (e) => { activeCropTarget = 'server'; handleImageSelect(e); });
 
@@ -793,6 +631,7 @@ btnApplyCrop.addEventListener('click', () => {
   cropModal.classList.add('hidden');
 });
 
+// ==================== MODAL PERFIL ====================
 btnOpenSelfProfile.addEventListener('click', async () => {
   const profileSnap = await getDoc(doc(db, "profiles", currentUsername));
   const data = profileSnap.data() || {};
@@ -809,6 +648,8 @@ btnOpenSelfProfile.addEventListener('click', async () => {
   editPronouns.value = data.pronouns || '';
   editBio.value = data.bio || '';
   aplicarBannerNaVisualizacao(data.bannerUrl || 'default', profileBannerPreview);
+  userRolesSection.style.display = 'none';
+  moderationActions.style.display = 'none';
 
   if (data.avatarUrl) {
     modalAvatarPreview.style.backgroundImage = `url(${data.avatarUrl})`;
@@ -816,35 +657,6 @@ btnOpenSelfProfile.addEventListener('click', async () => {
   } else {
     modalAvatarPreview.style.backgroundImage = 'none';
     modalAvatarPreview.textContent = currentUsername[0].toUpperCase();
-  }
-  profileModal.classList.remove('hidden');
-});
-
-btnOpenTargetProfile.addEventListener('click', async () => {
-  if (currentServerId && activeServerData) { abrirModalInfoServidor(); return; }
-  if (!targetUsername) return;
-  const profileSnap = await getDoc(doc(db, "profiles", targetUsername));
-  const data = profileSnap.data() || {};
-  profileModalTitle.textContent = `@${targetUsername}`;
-  btnSaveProfile.classList.add('hidden');
-  modalAvatarEditOverlay.classList.add('hidden');
-  editDisplayName.classList.add('hidden');
-  editPronouns.classList.add('hidden');
-  editBio.classList.add('hidden');
-  viewDisplayName.classList.remove('hidden');
-  viewPronouns.classList.remove('hidden');
-  viewBio.classList.remove('hidden');
-  viewDisplayName.textContent = data.displayName || targetUsername;
-  viewPronouns.textContent = data.pronouns || 'Não informado';
-  viewBio.textContent = data.bio || 'Sem biografia.';
-  aplicarBannerNaVisualizacao(data.bannerUrl || 'default', profileBannerPreview);
-
-  if (data.avatarUrl) {
-    modalAvatarPreview.style.backgroundImage = `url(${data.avatarUrl})`;
-    modalAvatarPreview.textContent = '';
-  } else {
-    modalAvatarPreview.style.backgroundImage = 'none';
-    modalAvatarPreview.textContent = targetUsername[0].toUpperCase();
   }
   profileModal.classList.remove('hidden');
 });
@@ -873,7 +685,197 @@ btnSaveProfile.addEventListener('click', async () => {
   }
 });
 
+// ==================== ABRIR PERFIL DE OUTRO USUÁRIO ====================
+async function abrirPerfilUsuario(username) {
+  if (!username || username === currentUsername) return;
+  targetUserForModeration = username;
+  
+  const profileSnap = await getDoc(doc(db, "profiles", username));
+  const data = profileSnap.data() || {};
+  
+  profileModalTitle.textContent = `@${username}`;
+  btnSaveProfile.classList.add('hidden');
+  modalAvatarEditOverlay.classList.add('hidden');
+  editDisplayName.classList.add('hidden');
+  editPronouns.classList.add('hidden');
+  editBio.classList.add('hidden');
+  viewDisplayName.classList.remove('hidden');
+  viewPronouns.classList.remove('hidden');
+  viewBio.classList.remove('hidden');
+  viewDisplayName.textContent = data.displayName || username;
+  viewPronouns.textContent = data.pronouns || 'Não informado';
+  viewBio.textContent = data.bio || 'Sem biografia.';
+  aplicarBannerNaVisualizacao(data.bannerUrl || 'default', profileBannerPreview);
+
+  if (data.avatarUrl) {
+    modalAvatarPreview.style.backgroundImage = `url(${data.avatarUrl})`;
+    modalAvatarPreview.textContent = '';
+  } else {
+    modalAvatarPreview.style.backgroundImage = 'none';
+    modalAvatarPreview.textContent = username[0].toUpperCase();
+  }
+
+  // Verificar se está em um servidor
+  if (currentServerId) {
+    const isMember = await verificarMembroServidor(currentServerId, username);
+    if (isMember) {
+      // Mostrar cargos do usuário
+      const userRoles = await getUserRolesWithData(currentServerId, username);
+      if (userRoles.length > 0) {
+        userRolesSection.style.display = 'flex';
+        userRolesList.innerHTML = userRoles.map(r => 
+          `<span class="role-item" style="color:${r.color || '#ffffff'};">● ${r.name}</span>`
+        ).join('');
+      } else {
+        userRolesSection.style.display = 'flex';
+        userRolesList.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">Nenhum cargo</span>';
+      }
+
+      // Verificar permissões do usuário atual
+      const canKick = await userHasPermission(currentServerId, currentUsername, 'kick');
+      const canBan = await userHasPermission(currentServerId, currentUsername, 'ban');
+      const canManageRoles = await userHasPermission(currentServerId, currentUsername, 'manageRoles');
+      const isOwner = activeServerData && activeServerData.owner === currentUsername;
+
+      if ((canKick || canBan || canManageRoles || isOwner) && username !== currentUsername) {
+        moderationActions.style.display = 'flex';
+        btnKickUser.style.display = canKick || isOwner ? 'inline-flex' : 'none';
+        btnBanUser.style.display = canBan || isOwner ? 'inline-flex' : 'none';
+        btnAssignRole.style.display = canManageRoles || isOwner ? 'inline-flex' : 'none';
+      } else {
+        moderationActions.style.display = 'none';
+      }
+    } else {
+      userRolesSection.style.display = 'none';
+      moderationActions.style.display = 'none';
+    }
+  } else {
+    userRolesSection.style.display = 'none';
+    moderationActions.style.display = 'none';
+  }
+
+  profileModal.classList.remove('hidden');
+}
+
+btnOpenTargetProfile.addEventListener('click', () => {
+  if (currentServerId && activeServerData) {
+    abrirModalInfoServidor();
+  } else if (targetUsername) {
+    abrirPerfilUsuario(targetUsername);
+  }
+});
+
+// ==================== MODERAÇÃO ====================
+btnKickUser.addEventListener('click', async () => {
+  if (!targetUserForModeration || !currentServerId) return;
+  if (confirm(`Deseja expulsar @${targetUserForModeration} do servidor?`)) {
+    try {
+      await updateDoc(doc(db, "servers", currentServerId), {
+        members: arrayRemove(targetUserForModeration)
+      });
+      await deleteDoc(doc(db, "servers", currentServerId, "members", targetUserForModeration));
+      showToast(`@${targetUserForModeration} foi expulso.`);
+      profileModal.classList.add('hidden');
+      abrirModalInfoServidor();
+    } catch (e) {
+      showToast('Erro ao expulsar: ' + e.message);
+    }
+  }
+});
+
+btnBanUser.addEventListener('click', async () => {
+  if (!targetUserForModeration || !currentServerId) return;
+  if (confirm(`Deseja banir @${targetUserForModeration} do servidor?`)) {
+    try {
+      await updateDoc(doc(db, "servers", currentServerId), {
+        members: arrayRemove(targetUserForModeration),
+        banned: arrayUnion(targetUserForModeration)
+      });
+      await deleteDoc(doc(db, "servers", currentServerId, "members", targetUserForModeration));
+      showToast(`@${targetUserForModeration} foi banido.`);
+      profileModal.classList.add('hidden');
+      abrirModalInfoServidor();
+    } catch (e) {
+      showToast('Erro ao banir: ' + e.message);
+    }
+  }
+});
+
+btnAssignRole.addEventListener('click', () => {
+  if (!targetUserForModeration || !currentServerId) return;
+  abrirModalAtribuirCargo(targetUserForModeration);
+});
+
+// ==================== ATRIBUIR CARGO ====================
+async function abrirModalAtribuirCargo(username) {
+  assignRoleList.innerHTML = '';
+  assignRoleModal.classList.remove('hidden');
+
+  try {
+    const rolesSnap = await getDocs(collection(db, "servers", currentServerId, "roles"));
+    const userRoles = await getUserRoles(currentServerId, username);
+
+    if (rolesSnap.empty) {
+      assignRoleList.innerHTML = '<div style="color:var(--text-muted);font-size:13px;text-align:center;">Nenhum cargo disponível.</div>';
+      return;
+    }
+
+    for (const docSnap of rolesSnap.docs) {
+      const role = docSnap.data();
+      const roleId = docSnap.id;
+      const hasRole = userRoles.includes(roleId);
+
+      const div = document.createElement('div');
+      div.style.cssText = "display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);padding:8px 12px;border-radius:8px;";
+      div.innerHTML = `
+        <span style="color:${role.color || '#ffffff'};font-weight:500;font-size:13px;">${role.name}</span>
+        <button class="btn" style="padding:4px 12px;font-size:11px;background:${hasRole ? '#ff1744' : '#23c268'};">
+          ${hasRole ? 'Remover' : 'Adicionar'}
+        </button>
+      `;
+
+      const btn = div.querySelector('button');
+      btn.addEventListener('click', async () => {
+        try {
+          const memberRef = doc(db, "servers", currentServerId, "members", username);
+          const currentRoles = await getUserRoles(currentServerId, username);
+          let newRoles;
+          if (currentRoles.includes(roleId)) {
+            newRoles = currentRoles.filter(id => id !== roleId);
+          } else {
+            newRoles = [...currentRoles, roleId];
+          }
+          await setDoc(memberRef, { roles: newRoles }, { merge: true });
+          showToast(`Cargo ${hasRole ? 'removido' : 'adicionado'}!`, 'success');
+          abrirModalAtribuirCargo(username);
+        } catch (e) {
+          showToast('Erro: ' + e.message);
+        }
+      });
+
+      assignRoleList.appendChild(div);
+    }
+  } catch (e) {
+    showToast('Erro ao carregar cargos: ' + e.message);
+  }
+}
+
+btnCloseAssignRoleModal.addEventListener('click', () => {
+  assignRoleModal.classList.add('hidden');
+});
+
 // ==================== SERVIDORES ====================
+function verificarMembroServidor(serverId, username) {
+  return new Promise(async (resolve) => {
+    const snap = await getDoc(doc(db, "servers", serverId));
+    if (snap.exists() && snap.data().members.includes(username)) {
+      resolve(true);
+    } else {
+      resolve(false);
+    }
+  });
+}
+
 btnOpenCreateServer.addEventListener('click', () => {
   inputServerName.value = `Servidor de .${currentUsername}®`;
   inputServerDesc.value = 'Bem-vindo ao nosso servidor!';
@@ -918,6 +920,26 @@ btnConfirmCreateServer.addEventListener('click', async () => {
       createdAt: serverTimestamp()
     });
 
+    // Criar documento de membro com roles vazio
+    await setDoc(doc(db, "servers", serverRef.id, "members", currentUsername), {
+      roles: []
+    });
+
+    // Criar cargo @todos padrão
+    await setDoc(doc(db, "servers", serverRef.id, "roles", "everyone"), {
+      name: "@todos",
+      color: "#ffffff",
+      permissions: {
+        sendMessage: true,
+        mentionRoles: false,
+        textEditor: false,
+        manageRoles: false,
+        kick: false,
+        ban: false
+      },
+      isDefault: true
+    });
+
     newlyCreatedServerId = serverRef.id;
     newlyCreatedInviteCode = inviteCode;
 
@@ -944,7 +966,7 @@ btnCloseInviteModal.addEventListener('click', () => {
 
 btnCopyInviteLink.addEventListener('click', () => {
   navigator.clipboard.writeText(txtInviteLink.textContent);
-  showToast('Link copiado para a área de transferência!', 'success');
+  showToast('Link copiado!', 'success');
 });
 
 async function carregarListaAmigosParaConvite(serverId) {
@@ -988,8 +1010,6 @@ async function carregarListaAmigosParaConvite(serverId) {
           timestamp: serverTimestamp()
         });
         showToast(`Convite enviado para @${fUser}!`, 'success');
-        // Adiciona moedas ao convidar
-        await adicionarMoedas(2);
       });
       inviteFriendsListContainer.appendChild(row);
     }
@@ -1023,6 +1043,7 @@ function carregarServidores() {
   });
 }
 
+// ==================== CHAT ====================
 async function abrirServidorChat(serverId) {
   currentServerId = serverId;
   targetUsername = null;
@@ -1048,361 +1069,6 @@ async function abrirServidorChat(serverId) {
   setupTypingSystem();
 }
 
-async function processarTextoComEmbeds(text, bodyDiv) {
-  if (!text) return;
-  const textDiv = document.createElement('div');
-  textDiv.className = 'chat-msg-text';
-
-  const inviteRegex = /starcord\.gg\/([a-zA-Z0-9]+)/g;
-  
-  if (inviteRegex.test(text)) {
-    inviteRegex.lastIndex = 0;
-    let match;
-    let lastIdx = 0;
-
-    while ((match = inviteRegex.exec(text)) !== null) {
-      if (match.index > lastIdx) {
-        let span = document.createElement('span');
-        span.textContent = text.substring(lastIdx, match.index);
-        textDiv.appendChild(span);
-      }
-
-      let inviteCode = match[1];
-
-      let linkSpan = document.createElement('span');
-      linkSpan.style.color = "var(--accent-red)";
-      linkSpan.style.fontWeight = "600";
-      linkSpan.textContent = match[0];
-      textDiv.appendChild(linkSpan);
-
-      try {
-        const q = query(collection(db, "servers"), where("inviteCode", "==", inviteCode));
-        const querySnapshot = await getDocs(q);
-
-        const embedCard = document.createElement('div');
-        embedCard.className = 'invite-embed-card';
-
-        if (!querySnapshot.empty) {
-          const sDoc = querySnapshot.docs[0];
-          const sData = sDoc.data();
-          const sId = sDoc.id;
-          const bannerBg = sData.bannerColor || '#000000';
-
-          embedCard.innerHTML = `
-            <div class="invite-embed-banner" style="background-color: ${bannerBg};"></div>
-            <div class="invite-embed-body">
-              <div class="invite-embed-top">
-                <div class="invite-embed-avatar" ${sData.iconUrl ? 'style="background-image:url(\''+sData.iconUrl+'\')"' : ''}>${sData.iconUrl ? '' : sData.name[0].toUpperCase()}</div>
-                <div class="invite-embed-title-area">
-                  <div class="invite-embed-name">${sData.name} <span style="color:#23c268; font-size:12px;" title="Verificado">✔</span></div>
-                  <div class="invite-embed-members">🟢 ${Math.floor(Math.random()*15 + 3)} online • ${sData.members ? sData.members.length : 1} membros</div>
-                </div>
-              </div>
-              <div class="invite-embed-desc-text">${sData.description || 'Servidor da comunidade Starcord.'}</div>
-              <button class="invite-embed-join-btn">Ir para o Servidor</button>
-            </div>
-          `;
-
-          const joinBtn = embedCard.querySelector('.invite-embed-join-btn');
-          joinBtn.addEventListener('click', async () => {
-            if (!sData.members.includes(currentUsername)) {
-              await updateDoc(doc(db, "servers", sId), {
-                members: arrayUnion(currentUsername)
-              });
-              showToast(`Você entrou em ${sData.name}!`, 'success');
-              // Adiciona moedas ao entrar no servidor
-              await adicionarMoedas(5);
-            }
-            abrirServidorChat(sId);
-          });
-
-        } else {
-          embedCard.innerHTML = `
-            <div class="invite-embed-banner" style="background-color: #ff4d4d;"></div>
-            <div class="invite-embed-body">
-              <div class="invite-embed-name" style="color: #ff4d4d;">Convite Inválido</div>
-              <div class="invite-embed-desc-text">O link <b>starcord.gg/${inviteCode}</b> não existe ou o servidor foi excluído.</div>
-            </div>
-          `;
-        }
-
-        textDiv.appendChild(embedCard);
-      } catch(err) {
-        console.error(err);
-      }
-
-      lastIdx = inviteRegex.lastIndex;
-    }
-
-    if (lastIdx < text.length) {
-      let span = document.createElement('span');
-      span.textContent = text.substring(lastIdx);
-      textDiv.appendChild(span);
-    }
-  } else {
-    textDiv.textContent = text;
-  }
-
-  bodyDiv.appendChild(textDiv);
-}
-
-function carregarMensagensServidor(serverId) {
-  chatMessages.innerHTML = '';
-  const q = query(collection(db, "servers", serverId, "messages"), orderBy("timestamp", "asc"));
-  if (unsubscribeMessages) unsubscribeMessages();
-
-  unsubscribeMessages = onSnapshot(q, async (snapshot) => {
-    chatMessages.innerHTML = '';
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data();
-      let name = data.senderDisplayName;
-      let avatar = data.senderAvatar;
-
-      if (!name || avatar === undefined) {
-        const p = await getProfileCached(data.sender);
-        name = p.displayName || data.sender;
-        avatar = p.avatarUrl || '';
-      }
-
-      let hora = '';
-      if (data.timestamp) {
-        hora = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      }
-
-      const row = document.createElement('div');
-      row.classList.add('chat-message-row');
-
-      const avatarDiv = document.createElement('div');
-      avatarDiv.className = 'chat-msg-avatar';
-      if (avatar) avatarDiv.style.backgroundImage = `url('${avatar}')`;
-      else avatarDiv.textContent = name ? name[0].toUpperCase() : '?';
-
-      const bodyDiv = document.createElement('div');
-      bodyDiv.className = 'chat-msg-body';
-
-      const headerDiv = document.createElement('div');
-      headerDiv.className = 'chat-msg-header';
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'chat-msg-name';
-      nameSpan.textContent = name;
-      const timeSpan = document.createElement('span');
-      timeSpan.className = 'chat-msg-time';
-      timeSpan.textContent = hora;
-
-      headerDiv.appendChild(nameSpan);
-      headerDiv.appendChild(timeSpan);
-      bodyDiv.appendChild(headerDiv);
-
-      if (data.text) {
-        await processarTextoComEmbeds(data.text, bodyDiv);
-      }
-
-      if (data.fileUrl) {
-        const img = document.createElement('img');
-        img.src = data.fileUrl;
-        img.alt = 'Anexo';
-        bodyDiv.appendChild(img);
-      }
-
-      row.appendChild(avatarDiv);
-      row.appendChild(bodyDiv);
-      chatMessages.appendChild(row);
-    }
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  });
-}
-
-btnServerHeaderInfo.addEventListener('click', abrirModalInfoServidor);
-
-async function abrirModalInfoServidor() {
-  if (!currentServerId) return;
-  const sSnap = await getDoc(doc(db, "servers", currentServerId));
-  if (!sSnap.exists()) return;
-  activeServerData = sSnap.data();
-
-  serverInfoModalTitle.textContent = activeServerData.name;
-  serverInfoName.textContent = activeServerData.name;
-  serverInfoOwner.textContent = `Dono: @${activeServerData.owner}`;
-  serverInfoDescText.textContent = activeServerData.description || 'Sem descrição.';
-  modalServerInviteLink.textContent = `starcord.gg/${activeServerData.inviteCode}`;
-
-  if (activeServerData.iconUrl) {
-    serverInfoModalAvatar.style.backgroundImage = `url(${activeServerData.iconUrl})`;
-    serverInfoModalAvatar.textContent = '';
-  } else {
-    serverInfoModalAvatar.style.backgroundImage = 'none';
-    serverInfoModalAvatar.textContent = activeServerData.name[0].toUpperCase();
-  }
-
-  const isOwner = activeServerData.owner === currentUsername;
-  if (isOwner) {
-    btnSaveServerEdit.classList.remove('hidden');
-    editServerNameInput.classList.remove('hidden');
-    editServerDescInput.classList.remove('hidden');
-    editBannerColorSection.classList.remove('hidden');
-    serverInfoName.classList.add('hidden');
-    serverInfoDescText.classList.add('hidden');
-
-    editServerNameInput.value = activeServerData.name;
-    editServerDescInput.value = activeServerData.description || '';
-    editSelectedBannerColor = activeServerData.bannerColor || '#000000';
-
-    document.getElementById('previewColorEdit').style.backgroundColor = editSelectedBannerColor;
-    document.getElementById('txtColorEdit').textContent = editSelectedBannerColor;
-
-    btnLeaveOrDeleteServer.textContent = "Excluir Servidor";
-  } else {
-    btnSaveServerEdit.classList.add('hidden');
-    editServerNameInput.classList.add('hidden');
-    editServerDescInput.classList.add('hidden');
-    editBannerColorSection.classList.add('hidden');
-    serverInfoName.classList.remove('hidden');
-    serverInfoDescText.classList.remove('hidden');
-    btnLeaveOrDeleteServer.textContent = "Sair do Servidor";
-  }
-
-  serverMembersListContainer.innerHTML = '';
-  for (const mUser of activeServerData.members) {
-    const mProfile = await getProfileCached(mUser);
-    const mRow = document.createElement('div');
-    mRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); padding: 6px 10px; border-radius: 8px;";
-    
-    let mAvatar = mProfile.avatarUrl ? `<div class="friend-avatar" style="width:28px;height:28px;background-image:url('${mProfile.avatarUrl}')"></div>` : `<div class="friend-avatar" style="width:28px;height:28px;font-size:11px;">${(mProfile.displayName||mUser)[0].toUpperCase()}</div>`;
-    let actionHtml = '';
-    if (isOwner && mUser !== currentUsername) {
-      actionHtml = `<button class="btn" style="background:#ff4d4d; padding:4px 8px; font-size:10px;" data-kick="${mUser}">Expulsar</button>`;
-    } else if (mUser === activeServerData.owner) {
-      actionHtml = `<span style="font-size:10px; color:var(--accent-red); font-weight:700;">DONO</span>`;
-    }
-
-    mRow.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px;">
-        ${mAvatar}
-        <span style="font-size: 12px; font-weight: 600;">${mProfile.displayName || mUser} (@${mUser})</span>
-      </div>
-      ${actionHtml}
-    `;
-
-    if (isOwner && mUser !== currentUsername) {
-      mRow.querySelector('button').addEventListener('click', async () => {
-        if (confirm(`Deseja expulsar @${mUser} do servidor?`)) {
-          await updateDoc(doc(db, "servers", currentServerId), { members: arrayRemove(mUser) });
-          showToast(`@${mUser} foi expulso.`);
-          abrirModalInfoServidor();
-        }
-      });
-    }
-    serverMembersListContainer.appendChild(mRow);
-  }
-
-  serverInfoModal.classList.remove('hidden');
-}
-
-btnCloseServerInfoModal.addEventListener('click', () => { serverInfoModal.classList.add('hidden'); });
-
-btnModalCopyLink.addEventListener('click', () => {
-  navigator.clipboard.writeText(modalServerInviteLink.textContent);
-  showToast('Link de convite copiado!', 'success');
-});
-
-btnOpenInviteMore.addEventListener('click', () => {
-  serverInfoModal.classList.add('hidden');
-  newlyCreatedInviteCode = activeServerData.inviteCode;
-  newlyCreatedServerId = currentServerId;
-  abrirModalConvidarAmigos(currentServerId, activeServerData.inviteCode);
-});
-
-btnSaveServerEdit.addEventListener('click', async () => {
-  const newName = editServerNameInput.value.trim() || activeServerData.name;
-  const newDesc = editServerDescInput.value.trim();
-
-  try {
-    await updateDoc(doc(db, "servers", currentServerId), {
-      name: newName,
-      description: newDesc,
-      bannerColor: editSelectedBannerColor
-    });
-    showToast('Servidor atualizado com sucesso!', 'success');
-    serverInfoModal.classList.add('hidden');
-    abrirServidorChat(currentServerId);
-  } catch (err) {
-    showToast('Erro ao atualizar servidor.');
-  }
-});
-
-btnLeaveOrDeleteServer.addEventListener('click', async () => {
-  const isOwner = activeServerData.owner === currentUsername;
-  if (isOwner) {
-    if (confirm('Tem certeza que deseja excluir permanentemente este servidor?')) {
-      await deleteDoc(doc(db, "servers", currentServerId));
-      serverInfoModal.classList.add('hidden');
-      appScreen.classList.remove('chat-open');
-      currentServerId = null;
-      showToast('Servidor excluído.');
-    }
-  } else {
-    if (confirm('Tem certeza que deseja sair deste servidor?')) {
-      await updateDoc(doc(db, "servers", currentServerId), { members: arrayRemove(currentUsername) });
-      serverInfoModal.classList.add('hidden');
-      appScreen.classList.remove('chat-open');
-      currentServerId = null;
-      showToast('Você saiu do servidor.');
-    }
-  }
-});
-
-// ==================== AMIGOS ====================
-btnAddFriend.addEventListener('click', async () => {
-  const friendUser = cleanUsername(friendUsernameInput.value);
-  if (!friendUser) return;
-  if (friendUser === currentUsername) { showToast('Você não pode adicionar a si mesmo.'); return; }
-
-  btnAddFriend.disabled = true;
-  try {
-    const friendProfileSnap = await getDoc(doc(db, "profiles", friendUser));
-    if (!friendProfileSnap.exists()) { showToast('Usuário não encontrado.'); return; }
-
-    await setDoc(doc(db, "users", currentUsername, "friends", friendUser), { username: friendUser, addedAt: serverTimestamp() });
-    await setDoc(doc(db, "users", friendUser, "friends", currentUsername), { username: currentUsername, addedAt: serverTimestamp() });
-
-    friendUsernameInput.value = '';
-    showToast(`@${friendUser} adicionado!`, 'success');
-    // Adiciona moedas ao adicionar amigo
-    await adicionarMoedas(3);
-  } catch (err) {
-    showToast('Erro ao adicionar amigo: ' + err.message);
-  } finally {
-    btnAddFriend.disabled = false;
-  }
-});
-
-function carregarAmigos() {
-  const friendsRef = collection(db, "users", currentUsername, "friends");
-  onSnapshot(friendsRef, (snapshot) => {
-    friendsList.innerHTML = '';
-    snapshot.forEach(async (docSnap) => {
-      const friendUser = docSnap.id;
-      const pData = await getProfileCached(friendUser);
-      const item = document.createElement('div');
-      item.classList.add('friend-item');
-      let avatarStyle = pData.avatarUrl ? `style="background-image: url('${pData.avatarUrl}')"` : '';
-      let avatarContent = pData.avatarUrl ? '' : (pData.displayName || friendUser)[0].toUpperCase();
-
-      item.innerHTML = `
-        <div class="friend-avatar-wrapper">
-          <div class="friend-avatar" ${avatarStyle}>${avatarContent}</div>
-        </div>
-        <div class="friend-details">
-          <div class="friend-name">${pData.displayName || friendUser}</div>
-          <div class="friend-last-msg">@${friendUser}</div>
-        </div>
-      `;
-      item.addEventListener('click', () => abrirChatAmigo(friendUser, pData));
-      friendsList.appendChild(item);
-    });
-  });
-}
-
 async function abrirChatAmigo(friendUser, pData) {
   targetUsername = friendUser;
   currentServerId = null;
@@ -1422,6 +1088,265 @@ async function abrirChatAmigo(friendUser, pData) {
   appScreen.classList.add('chat-open');
   carregarMensagensChatPrivado(friendUser);
   setupTypingSystem();
+}
+
+// ==================== MENSAGENS ====================
+function processarTexto(text, userRoles = []) {
+  let html = text;
+  
+  // Processar # ## ###
+  const lines = html.split('\n');
+  let processed = [];
+  for (const line of lines) {
+    if (line.startsWith('### ')) {
+      processed.push(`<h3>${line.substring(4)}</h3>`);
+    } else if (line.startsWith('## ')) {
+      processed.push(`<h2>${line.substring(3)}</h2>`);
+    } else if (line.startsWith('# ')) {
+      processed.push(`<h1>${line.substring(2)}</h1>`);
+    } else {
+      processed.push(line);
+    }
+  }
+  html = processed.join('\n');
+
+  // Processar menções de cargo
+  if (currentServerId) {
+    html = html.replace(/@(\w+)/g, async (match, roleName) => {
+      const rolesSnap = await getDocs(collection(db, "servers", currentServerId, "roles"));
+      for (const docSnap of rolesSnap.docs) {
+        const role = docSnap.data();
+        if (role.name === `@${roleName}` || role.name === roleName) {
+          return `<span class="role-mention" style="color:${role.color || '#ffffff'};">@${roleName}</span>`;
+        }
+      }
+      return match;
+    });
+  }
+
+  return html;
+}
+
+async function processarTextoComEmbeds(text, bodyDiv, userRoles = []) {
+  if (!text) return;
+  
+  const textDiv = document.createElement('div');
+  textDiv.className = 'chat-msg-text';
+
+  // Processar formatação
+  let processedText = text;
+  
+  // Cores e animações
+  if (text.includes('[rainbow]')) {
+    processedText = processedText.replace(/\[rainbow\](.*?)\[\/rainbow\]/g, 
+      '<span class="text-rainbow">$1</span>');
+  }
+  if (text.includes('[gradient]')) {
+    processedText = processedText.replace(/\[gradient\](.*?)\[\/gradient\]/g, 
+      '<span class="text-gradient">$1</span>');
+  }
+
+  // Processar # ## ###
+  const lines = processedText.split('\n');
+  let processed = [];
+  for (const line of lines) {
+    if (line.startsWith('### ')) {
+      processed.push(`<h3>${line.substring(4)}</h3>`);
+    } else if (line.startsWith('## ')) {
+      processed.push(`<h2>${line.substring(3)}</h2>`);
+    } else if (line.startsWith('# ')) {
+      processed.push(`<h1>${line.substring(2)}</h1>`);
+    } else {
+      processed.push(line);
+    }
+  }
+  processedText = processed.join('\n');
+
+  // Processar menções de cargo
+  if (currentServerId) {
+    const rolesSnap = await getDocs(collection(db, "servers", currentServerId, "roles"));
+    const rolesMap = {};
+    rolesSnap.forEach(docSnap => {
+      const role = docSnap.data();
+      rolesMap[role.name.replace('@', '')] = role.color || '#ffffff';
+    });
+
+    for (const [roleName, color] of Object.entries(rolesMap)) {
+      const regex = new RegExp(`@${roleName}\\b`, 'g');
+      processedText = processedText.replace(regex, 
+        `<span class="role-mention" style="color:${color};">@${roleName}</span>`);
+    }
+  }
+
+  // Processar convites
+  const inviteRegex = /starcord\.gg\/([a-zA-Z0-9]+)/g;
+  let lastIdx = 0;
+  let match;
+  let tempText = processedText;
+  const parts = [];
+
+  while ((match = inviteRegex.exec(tempText)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push({ type: 'text', content: tempText.substring(lastIdx, match.index) });
+    }
+    parts.push({ type: 'invite', code: match[1], full: match[0] });
+    lastIdx = inviteRegex.lastIndex;
+  }
+  if (lastIdx < tempText.length) {
+    parts.push({ type: 'text', content: tempText.substring(lastIdx) });
+  }
+
+  if (parts.length === 0) {
+    textDiv.innerHTML = tempText;
+  } else {
+    for (const part of parts) {
+      if (part.type === 'text') {
+        const span = document.createElement('span');
+        span.innerHTML = part.content;
+        textDiv.appendChild(span);
+      } else if (part.type === 'invite') {
+        const linkSpan = document.createElement('span');
+        linkSpan.style.color = "var(--accent-red)";
+        linkSpan.style.fontWeight = "600";
+        linkSpan.textContent = part.full;
+        textDiv.appendChild(linkSpan);
+
+        try {
+          const q = query(collection(db, "servers"), where("inviteCode", "==", part.code));
+          const querySnapshot = await getDocs(q);
+
+          const embedCard = document.createElement('div');
+          embedCard.className = 'invite-embed-card';
+
+          if (!querySnapshot.empty) {
+            const sDoc = querySnapshot.docs[0];
+            const sData = sDoc.data();
+            const sId = sDoc.id;
+            const bannerBg = sData.bannerColor || '#000000';
+
+            embedCard.innerHTML = `
+              <div class="invite-embed-banner" style="background-color: ${bannerBg};"></div>
+              <div class="invite-embed-body">
+                <div class="invite-embed-top">
+                  <div class="invite-embed-avatar" ${sData.iconUrl ? 'style="background-image:url(\''+sData.iconUrl+'\')"' : ''}>${sData.iconUrl ? '' : sData.name[0].toUpperCase()}</div>
+                  <div class="invite-embed-title-area">
+                    <div class="invite-embed-name">${sData.name} <span style="color:#23c268; font-size:12px;">✔</span></div>
+                    <div class="invite-embed-members">🟢 ${sData.members ? sData.members.length : 1} membros</div>
+                  </div>
+                </div>
+                <div class="invite-embed-desc-text">${sData.description || 'Servidor da comunidade Starcord.'}</div>
+                <button class="invite-embed-join-btn">Ir para o Servidor</button>
+              </div>
+            `;
+
+            const joinBtn = embedCard.querySelector('.invite-embed-join-btn');
+            joinBtn.addEventListener('click', async () => {
+              if (!sData.members.includes(currentUsername)) {
+                await updateDoc(doc(db, "servers", sId), {
+                  members: arrayUnion(currentUsername)
+                });
+                await setDoc(doc(db, "servers", sId, "members", currentUsername), {
+                  roles: []
+                }, { merge: true });
+                showToast(`Você entrou em ${sData.name}!`, 'success');
+              }
+              abrirServidorChat(sId);
+            });
+          } else {
+            embedCard.innerHTML = `
+              <div class="invite-embed-banner" style="background-color: #ff4d4d;"></div>
+              <div class="invite-embed-body">
+                <div class="invite-embed-name" style="color: #ff4d4d;">Convite Inválido</div>
+                <div class="invite-embed-desc-text">O link <b>starcord.gg/${part.code}</b> não existe.</div>
+              </div>
+            `;
+          }
+          textDiv.appendChild(embedCard);
+        } catch(err) {
+          console.error(err);
+        }
+      }
+    }
+  }
+
+  bodyDiv.appendChild(textDiv);
+}
+
+// ==================== CARREGAR MENSAGENS ====================
+function carregarMensagensServidor(serverId) {
+  chatMessages.innerHTML = '';
+  const q = query(collection(db, "servers", serverId, "messages"), orderBy("timestamp", "asc"));
+  if (unsubscribeMessages) unsubscribeMessages();
+
+  unsubscribeMessages = onSnapshot(q, async (snapshot) => {
+    chatMessages.innerHTML = '';
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      let name = data.senderDisplayName;
+      let avatar = data.senderAvatar;
+
+      if (!name || avatar === undefined) {
+        const p = await getProfileCached(data.sender);
+        name = p.displayName || data.sender;
+        avatar = p.avatarUrl || '';
+      }
+
+      // Buscar cargos do remetente
+      const userRoles = await getUserRolesWithData(serverId, data.sender);
+      const roleColor = userRoles.length > 0 ? userRoles[0].color : null;
+
+      let hora = '';
+      if (data.timestamp) {
+        hora = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+
+      const row = document.createElement('div');
+      row.classList.add('chat-message-row');
+
+      const avatarDiv = document.createElement('div');
+      avatarDiv.className = 'chat-msg-avatar';
+      if (avatar) avatarDiv.style.backgroundImage = `url('${avatar}')`;
+      else avatarDiv.textContent = name ? name[0].toUpperCase() : '?';
+      avatarDiv.addEventListener('click', () => abrirPerfilUsuario(data.sender));
+
+      const bodyDiv = document.createElement('div');
+      bodyDiv.className = 'chat-msg-body';
+
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'chat-msg-header';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'chat-msg-name';
+      nameSpan.textContent = name;
+      if (roleColor) {
+        nameSpan.style.color = roleColor;
+      }
+      nameSpan.addEventListener('click', () => abrirPerfilUsuario(data.sender));
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'chat-msg-time';
+      timeSpan.textContent = hora;
+
+      headerDiv.appendChild(nameSpan);
+      headerDiv.appendChild(timeSpan);
+      bodyDiv.appendChild(headerDiv);
+
+      if (data.text) {
+        await processarTextoComEmbeds(data.text, bodyDiv, userRoles);
+      }
+
+      if (data.fileUrl) {
+        const img = document.createElement('img');
+        img.src = data.fileUrl;
+        img.alt = 'Anexo';
+        bodyDiv.appendChild(img);
+      }
+
+      row.appendChild(avatarDiv);
+      row.appendChild(bodyDiv);
+      chatMessages.appendChild(row);
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
 }
 
 function carregarMensagensChatPrivado(friendUser) {
@@ -1455,6 +1380,7 @@ function carregarMensagensChatPrivado(friendUser) {
       avatarDiv.className = 'chat-msg-avatar';
       if (avatar) avatarDiv.style.backgroundImage = `url('${avatar}')`;
       else avatarDiv.textContent = name ? name[0].toUpperCase() : '?';
+      avatarDiv.addEventListener('click', () => abrirPerfilUsuario(data.sender));
 
       const bodyDiv = document.createElement('div');
       bodyDiv.className = 'chat-msg-body';
@@ -1464,6 +1390,8 @@ function carregarMensagensChatPrivado(friendUser) {
       const nameSpan = document.createElement('span');
       nameSpan.className = 'chat-msg-name';
       nameSpan.textContent = name;
+      nameSpan.addEventListener('click', () => abrirPerfilUsuario(data.sender));
+
       const timeSpan = document.createElement('span');
       timeSpan.className = 'chat-msg-time';
       timeSpan.textContent = hora;
@@ -1498,7 +1426,6 @@ chatForm.addEventListener('submit', async (e) => {
   if (!text) return;
   messageInput.value = '';
 
-  // Limpar status de digitação ao enviar
   if (targetUsername) {
     const chatId = [currentUsername, targetUsername].sort().join('_');
     await setDoc(doc(db, "typing_status", chatId), {
@@ -1510,6 +1437,13 @@ chatForm.addEventListener('submit', async (e) => {
   const myProfile = await getProfileCached(currentUsername);
 
   if (currentServerId) {
+    // Verificar permissão de enviar mensagem
+    const canSend = await userHasPermission(currentServerId, currentUsername, 'sendMessage');
+    if (!canSend) {
+      showToast('Você não tem permissão para enviar mensagens neste servidor.');
+      return;
+    }
+
     await addDoc(collection(db, "servers", currentServerId, "messages"), {
       text: text,
       fileUrl: null,
@@ -1518,8 +1452,6 @@ chatForm.addEventListener('submit', async (e) => {
       senderAvatar: myProfile.avatarUrl || '',
       timestamp: serverTimestamp()
     });
-    // Adiciona moedas ao enviar mensagem em servidor
-    await adicionarMoedas(1);
   } else if (targetUsername) {
     const roomId = [currentUsername, targetUsername].sort().join('_');
     await addDoc(collection(db, "chats", roomId, "messages"), {
@@ -1530,8 +1462,6 @@ chatForm.addEventListener('submit', async (e) => {
       senderAvatar: myProfile.avatarUrl || '',
       timestamp: serverTimestamp()
     });
-    // Adiciona moedas ao enviar mensagem privada
-    await adicionarMoedas(1);
   }
 });
 
@@ -1544,6 +1474,11 @@ fileInput.addEventListener('change', async (e) => {
     const myProfile = await getProfileCached(currentUsername);
 
     if (currentServerId) {
+      const canSend = await userHasPermission(currentServerId, currentUsername, 'sendMessage');
+      if (!canSend) {
+        showToast('Você não tem permissão para enviar arquivos.');
+        return;
+      }
       await addDoc(collection(db, "servers", currentServerId, "messages"), {
         text: '',
         fileUrl: fileUrl,
@@ -1552,7 +1487,6 @@ fileInput.addEventListener('change', async (e) => {
         senderAvatar: myProfile.avatarUrl || '',
         timestamp: serverTimestamp()
       });
-      await adicionarMoedas(1);
     } else if (targetUsername) {
       const roomId = [currentUsername, targetUsername].sort().join('_');
       await addDoc(collection(db, "chats", roomId, "messages"), {
@@ -1563,12 +1497,690 @@ fileInput.addEventListener('change', async (e) => {
         senderAvatar: myProfile.avatarUrl || '',
         timestamp: serverTimestamp()
       });
-      await adicionarMoedas(1);
     }
   };
   reader.readAsDataURL(file);
   e.target.value = '';
 });
 
-// Inicializa sistema de digitação
+// ==================== SISTEMA DE DIGITAÇÃO ====================
+function setupTypingSystem() {
+  const chatInput = messageInput;
+
+  chatInput.addEventListener('input', () => {
+    if (!targetUsername && !currentServerId) return;
+    
+    const chatId = targetUsername 
+      ? [currentUsername, targetUsername].sort().join('_') 
+      : `server_${currentServerId}`;
+
+    const typingRef = doc(db, "typing_status", chatId);
+
+    if (chatInput.value.trim().length > 0) {
+      if (!isTyping) {
+        isTyping = true;
+        setDoc(typingRef, {
+          user: currentUsername,
+          timestamp: serverTimestamp()
+        });
+      }
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        isTyping = false;
+        setDoc(typingRef, {
+          user: currentUsername,
+          timestamp: serverTimestamp()
+        });
+      }, 3000);
+    } else {
+      if (isTyping) {
+        isTyping = false;
+        clearTimeout(typingTimeout);
+        setDoc(typingRef, {
+          user: currentUsername,
+          timestamp: serverTimestamp()
+        });
+      }
+    }
+  });
+
+  function startListeningTyping() {
+    if (typingListenersUnsubscribe) {
+      typingListenersUnsubscribe();
+      typingListenersUnsubscribe = null;
+    }
+
+    if (!targetUsername && !currentServerId) return;
+
+    const chatId = targetUsername 
+      ? [currentUsername, targetUsername].sort().join('_') 
+      : `server_${currentServerId}`;
+
+    const typingRef = doc(db, "typing_status", chatId);
+    
+    typingListenersUnsubscribe = onSnapshot(typingRef, (docSnap) => {
+      if (!docSnap.exists()) {
+        typingIndicatorText.textContent = '';
+        return;
+      }
+
+      const data = docSnap.data();
+      const typingUser = data.user;
+      
+      if (typingUser === currentUsername) {
+        typingIndicatorText.textContent = '';
+        return;
+      }
+
+      const now = Date.now();
+      const typingTime = data.timestamp?.toDate?.()?.getTime() || 0;
+      const isRecent = (now - typingTime) < 5000;
+
+      if (isRecent && typingUser) {
+        getProfileCached(typingUser).then(profile => {
+          const displayName = profile.displayName || typingUser;
+          typingIndicatorText.textContent = `${displayName} está digitando...`;
+        });
+      } else {
+        typingIndicatorText.textContent = '';
+      }
+    });
+  }
+
+  // Iniciar quando o chat for aberto
+  if (targetUsername || currentServerId) {
+    startListeningTyping();
+  }
+
+  // Sobrescrever funções de abrir chat para configurar typing
+  const originalAbrirChat = abrirChatAmigo;
+  const originalAbrirServer = abrirServidorChat;
+
+  window.abrirChatAmigo = async function(friendUser, pData) {
+    await originalAbrirChat(friendUser, pData);
+    startListeningTyping();
+  };
+
+  window.abrirServidorChat = async function(serverId) {
+    await originalAbrirServer(serverId);
+    startListeningTyping();
+  };
+}
+
+// ==================== AMIGOS ====================
+btnAddFriend.addEventListener('click', async () => {
+  const friendUser = cleanUsername(friendUsernameInput.value);
+  if (!friendUser) return;
+  if (friendUser === currentUsername) { showToast('Você não pode adicionar a si mesmo.'); return; }
+
+  btnAddFriend.disabled = true;
+  try {
+    const friendProfileSnap = await getDoc(doc(db, "profiles", friendUser));
+    if (!friendProfileSnap.exists()) { showToast('Usuário não encontrado.'); return; }
+
+    await setDoc(doc(db, "users", currentUsername, "friends", friendUser), { username: friendUser, addedAt: serverTimestamp() });
+    await setDoc(doc(db, "users", friendUser, "friends", currentUsername), { username: currentUsername, addedAt: serverTimestamp() });
+
+    friendUsernameInput.value = '';
+    showToast(`@${friendUser} adicionado!`, 'success');
+  } catch (err) {
+    showToast('Erro ao adicionar amigo: ' + err.message);
+  } finally {
+    btnAddFriend.disabled = false;
+  }
+});
+
+function carregarAmigos() {
+  const friendsRef = collection(db, "users", currentUsername, "friends");
+  onSnapshot(friendsRef, (snapshot) => {
+    friendsList.innerHTML = '';
+    snapshot.forEach(async (docSnap) => {
+      const friendUser = docSnap.id;
+      const pData = await getProfileCached(friendUser);
+      const item = document.createElement('div');
+      item.classList.add('friend-item');
+      let avatarStyle = pData.avatarUrl ? `style="background-image: url('${pData.avatarUrl}')"` : '';
+      let avatarContent = pData.avatarUrl ? '' : (pData.displayName || friendUser)[0].toUpperCase();
+
+      item.innerHTML = `
+        <div class="friend-avatar-wrapper">
+          <div class="friend-avatar" ${avatarStyle}>${avatarContent}</div>
+        </div>
+        <div class="friend-details">
+          <div class="friend-name">${pData.displayName || friendUser}</div>
+          <div class="friend-last-msg">@${friendUser}</div>
+        </div>
+      `;
+      item.addEventListener('click', () => abrirChatAmigo(friendUser, pData));
+      friendsList.appendChild(item);
+    });
+  });
+}
+
+// ==================== SERVER INFO MODAL ====================
+btnServerHeaderInfo.addEventListener('click', abrirModalInfoServidor);
+
+async function abrirModalInfoServidor() {
+  if (!currentServerId) return;
+  const sSnap = await getDoc(doc(db, "servers", currentServerId));
+  if (!sSnap.exists()) return;
+  activeServerData = sSnap.data();
+
+  serverInfoModalTitle.textContent = activeServerData.name;
+  serverInfoName.textContent = activeServerData.name;
+  serverInfoOwner.textContent = `Dono: @${activeServerData.owner}`;
+  serverInfoDescText.textContent = activeServerData.description || 'Sem descrição.';
+  modalServerInviteLink.textContent = `starcord.gg/${activeServerData.inviteCode}`;
+
+  if (activeServerData.iconUrl) {
+    serverInfoModalAvatar.style.backgroundImage = `url(${activeServerData.iconUrl})`;
+    serverInfoModalAvatar.textContent = '';
+  } else {
+    serverInfoModalAvatar.style.backgroundImage = 'none';
+    serverInfoModalAvatar.textContent = activeServerData.name[0].toUpperCase();
+  }
+
+  const isOwner = activeServerData.owner === currentUsername;
+  if (isOwner) {
+    btnSaveServerEdit.classList.remove('hidden');
+    editServerNameInput.classList.remove('hidden');
+    editServerDescInput.classList.remove('hidden');
+    editBannerColorSection.classList.remove('hidden');
+    serverInfoName.classList.add('hidden');
+    serverInfoDescText.classList.add('hidden');
+
+    editServerNameInput.value = activeServerData.name;
+    editServerDescInput.value = activeServerData.description || '';
+    editSelectedBannerColor = activeServerData.bannerColor || '#000000';
+    document.getElementById('previewColorEdit').style.backgroundColor = editSelectedBannerColor;
+    document.getElementById('txtColorEdit').textContent = editSelectedBannerColor;
+
+    btnLeaveOrDeleteServer.textContent = "Excluir Servidor";
+  } else {
+    btnSaveServerEdit.classList.add('hidden');
+    editServerNameInput.classList.add('hidden');
+    editServerDescInput.classList.add('hidden');
+    editBannerColorSection.classList.add('hidden');
+    serverInfoName.classList.remove('hidden');
+    serverInfoDescText.classList.remove('hidden');
+    btnLeaveOrDeleteServer.textContent = "Sair do Servidor";
+  }
+
+  // Carregar cargos
+  carregarCargosServidor(currentServerId);
+
+  // Carregar membros
+  serverMembersListContainer.innerHTML = '';
+  for (const mUser of activeServerData.members) {
+    const mProfile = await getProfileCached(mUser);
+    const userRoles = await getUserRolesWithData(currentServerId, mUser);
+    const roleColor = userRoles.length > 0 ? userRoles[0].color : null;
+
+    const mRow = document.createElement('div');
+    mRow.className = 'member-row';
+    
+    const avatarStyle = mProfile.avatarUrl ? `background-image:url('${mProfile.avatarUrl}')` : '';
+    const avatarText = mProfile.avatarUrl ? '' : (mProfile.displayName || mUser)[0].toUpperCase();
+
+    let actionHtml = '';
+    const canKick = await userHasPermission(currentServerId, currentUsername, 'kick');
+    const canBan = await userHasPermission(currentServerId, currentUsername, 'ban');
+    
+    if ((isOwner || canKick || canBan) && mUser !== currentUsername) {
+      actionHtml = `
+        <div style="display:flex; gap:4px;">
+          ${canKick || isOwner ? `<button class="btn" style="background:#ff6b35; padding:4px 8px; font-size:10px;" data-kick="${mUser}">Expulsar</button>` : ''}
+          ${canBan || isOwner ? `<button class="btn" style="background:#ff1744; padding:4px 8px; font-size:10px;" data-ban="${mUser}">Banir</button>` : ''}
+        </div>
+      `;
+    } else if (mUser === activeServerData.owner) {
+      actionHtml = `<span style="font-size:10px; color:var(--accent-red); font-weight:700;">DONO</span>`;
+    }
+
+    mRow.innerHTML = `
+      <div class="member-info" data-user="${mUser}">
+        <div class="member-avatar-small" style="${avatarStyle}">${avatarText}</div>
+        <span class="member-name-role" style="${roleColor ? `color:${roleColor};` : ''}">${mProfile.displayName || mUser}</span>
+        ${userRoles.length > 0 ? `<span style="font-size:10px;color:var(--text-muted);">${userRoles.map(r => r.name).join(', ')}</span>` : ''}
+      </div>
+      ${actionHtml}
+    `;
+
+    // Click no membro abre perfil
+    mRow.querySelector('.member-info').addEventListener('click', () => {
+      abrirPerfilUsuario(mUser);
+    });
+
+    // Ações de kick/ban
+    if (canKick || isOwner) {
+      const kickBtn = mRow.querySelector('[data-kick]');
+      if (kickBtn) {
+        kickBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const user = kickBtn.dataset.kick;
+          if (confirm(`Expulsar @${user}?`)) {
+            await updateDoc(doc(db, "servers", currentServerId), { members: arrayRemove(user) });
+            await deleteDoc(doc(db, "servers", currentServerId, "members", user));
+            showToast(`@${user} expulso.`);
+            abrirModalInfoServidor();
+          }
+        });
+      }
+    }
+    if (canBan || isOwner) {
+      const banBtn = mRow.querySelector('[data-ban]');
+      if (banBtn) {
+        banBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const user = banBtn.dataset.ban;
+          if (confirm(`Banir @${user}?`)) {
+            await updateDoc(doc(db, "servers", currentServerId), { 
+              members: arrayRemove(user),
+              banned: arrayUnion(user)
+            });
+            await deleteDoc(doc(db, "servers", currentServerId, "members", user));
+            showToast(`@${user} banido.`);
+            abrirModalInfoServidor();
+          }
+        });
+      }
+    }
+
+    serverMembersListContainer.appendChild(mRow);
+  }
+
+  serverInfoModal.classList.remove('hidden');
+}
+
+// ==================== CARGOS DO SERVIDOR ====================
+async function carregarCargosServidor(serverId) {
+  serverRolesList.innerHTML = '';
+  
+  try {
+    const rolesSnap = await getDocs(collection(db, "servers", serverId, "roles"));
+    if (rolesSnap.empty) {
+      serverRolesList.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">Nenhum cargo criado.</span>';
+      return;
+    }
+
+    for (const docSnap of rolesSnap.docs) {
+      const role = docSnap.data();
+      const roleId = docSnap.id;
+      
+      const div = document.createElement('div');
+      div.className = 'role-item';
+      div.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:4px 8px;";
+      div.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="role-color-dot" style="background:${role.color || '#ffffff'};"></span>
+          <span style="color:${role.color || '#ffffff'};font-weight:500;font-size:13px;">${role.name}</span>
+          ${role.isDefault ? '<span style="font-size:10px;color:var(--text-muted);">(padrão)</span>' : ''}
+        </div>
+        ${!role.isDefault ? `<button class="btn" style="padding:2px 8px;font-size:10px;" data-roleid="${roleId}">Editar</button>` : ''}
+      `;
+
+      if (!role.isDefault) {
+        const editBtn = div.querySelector('button');
+        editBtn.addEventListener('click', () => abrirModalEditarCargo(roleId));
+      }
+
+      serverRolesList.appendChild(div);
+    }
+  } catch (e) {
+    console.error('Erro ao carregar cargos:', e);
+  }
+}
+
+// ==================== CRIAR/EDITAR CARGO ====================
+let editingRoleId = null;
+
+btnCreateRole.addEventListener('click', () => {
+  editingRoleId = null;
+  roleModalTitle.textContent = 'Criar Cargo';
+  inputRoleName.value = '';
+  roleSelectedColor = '#ffffff';
+  previewColorRole.style.backgroundColor = roleSelectedColor;
+  txtColorRole.textContent = roleSelectedColor;
+  permSendMessage.checked = true;
+  permMentionRoles.checked = false;
+  permTextEditor.checked = false;
+  permManageRoles.checked = false;
+  permKick.checked = false;
+  permBan.checked = false;
+  btnDeleteRole.style.display = 'none';
+  roleModal.classList.remove('hidden');
+});
+
+function abrirModalEditarCargo(roleId) {
+  editingRoleId = roleId;
+  roleModalTitle.textContent = 'Editar Cargo';
+  
+  getDoc(doc(db, "servers", currentServerId, "roles", roleId)).then((snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      inputRoleName.value = data.name || '';
+      roleSelectedColor = data.color || '#ffffff';
+      previewColorRole.style.backgroundColor = roleSelectedColor;
+      txtColorRole.textContent = roleSelectedColor;
+      permSendMessage.checked = data.permissions?.sendMessage || false;
+      permMentionRoles.checked = data.permissions?.mentionRoles || false;
+      permTextEditor.checked = data.permissions?.textEditor || false;
+      permManageRoles.checked = data.permissions?.manageRoles || false;
+      permKick.checked = data.permissions?.kick || false;
+      permBan.checked = data.permissions?.ban || false;
+      btnDeleteRole.style.display = 'inline-flex';
+      roleModal.classList.remove('hidden');
+    }
+  });
+}
+
+btnCloseRoleModal.addEventListener('click', () => { roleModal.classList.add('hidden'); });
+
+btnSaveRole.addEventListener('click', async () => {
+  const name = inputRoleName.value.trim();
+  if (!name) { showToast('Digite um nome para o cargo.'); return; }
+
+  const permissions = {
+    sendMessage: permSendMessage.checked,
+    mentionRoles: permMentionRoles.checked,
+    textEditor: permTextEditor.checked,
+    manageRoles: permManageRoles.checked,
+    kick: permKick.checked,
+    ban: permBan.checked
+  };
+
+  try {
+    if (editingRoleId) {
+      await updateDoc(doc(db, "servers", currentServerId, "roles", editingRoleId), {
+        name: name,
+        color: roleSelectedColor,
+        permissions: permissions
+      });
+      showToast('Cargo atualizado!', 'success');
+    } else {
+      const newRoleRef = doc(collection(db, "servers", currentServerId, "roles"));
+      await setDoc(newRoleRef, {
+        name: name,
+        color: roleSelectedColor,
+        permissions: permissions,
+        isDefault: false
+      });
+      showToast('Cargo criado!', 'success');
+    }
+    roleModal.classList.add('hidden');
+    carregarCargosServidor(currentServerId);
+  } catch (e) {
+    showToast('Erro: ' + e.message);
+  }
+});
+
+btnDeleteRole.addEventListener('click', async () => {
+  if (!editingRoleId) return;
+  if (confirm('Excluir este cargo permanentemente?')) {
+    try {
+      await deleteDoc(doc(db, "servers", currentServerId, "roles", editingRoleId));
+      // Remover cargo de todos os membros
+      const membersSnap = await getDocs(collection(db, "servers", currentServerId, "members"));
+      for (const memberDoc of membersSnap.docs) {
+        const memberData = memberDoc.data();
+        if (memberData.roles && memberData.roles.includes(editingRoleId)) {
+          await updateDoc(memberDoc.ref, {
+            roles: arrayRemove(editingRoleId)
+          });
+        }
+      }
+      showToast('Cargo excluído!', 'success');
+      roleModal.classList.add('hidden');
+      carregarCargosServidor(currentServerId);
+    } catch (e) {
+      showToast('Erro: ' + e.message);
+    }
+  }
+});
+
+// ==================== SELEÇÃO DE CORES ====================
+let pickerH = 0, pickerS = 0, pickerV = 0;
+let currentPickerCallback = null;
+
+const customColorPickerModal = document.getElementById('customColorPickerModal');
+const pickerHexInput = document.getElementById('pickerHexInput');
+const pickerSatBox = document.getElementById('pickerSatBox');
+const pickerSatBg = document.getElementById('pickerSatBg');
+const pickerSatPointer = document.getElementById('pickerSatPointer');
+const pickerHueBar = document.getElementById('pickerHueBar');
+const pickerHueThumb = document.getElementById('pickerHueThumb');
+const btnSelectColor = document.getElementById('btnSelectColor');
+
+function hsvToRgb(h, s, v) {
+  let r, g, b;
+  let i = Math.floor(h / 60) % 6;
+  let f = h / 60 - Math.floor(h / 60);
+  let p = v * (1 - s);
+  let q = v * (1 - f * s);
+  let t = v * (1 - (1 - f) * s);
+  switch (i) {
+    case 0: r = v; g = t; b = p; break;
+    case 1: r = q; g = v; b = p; break;
+    case 2: r = p; g = v; b = t; break;
+    case 3: r = p; g = q; b = v; break;
+    case 4: r = t; g = p; b = v; break;
+    case 5: r = v; g = p; b = q; break;
+  }
+  return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToHsv(hex) {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  if (hex.length !== 6) return { h: 0, s: 0, v: 0 };
+  let r = parseInt(hex.substring(0, 2), 16) / 255;
+  let g = parseInt(hex.substring(2, 4), 16) / 255;
+  let b = parseInt(hex.substring(4, 6), 16) / 255;
+  let max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, v = max;
+  let d = max - min;
+  s = max === 0 ? 0 : d / max;
+  if (max === min) { h = 0; } else {
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s: s, v: v };
+}
+
+function openCustomColorPicker(initialColor, onSelectCallback) {
+  currentPickerCallback = onSelectCallback;
+  const hsv = hexToHsv(initialColor || '#000000');
+  pickerH = hsv.h;
+  pickerS = hsv.s;
+  pickerV = hsv.v;
+  customColorPickerModal.classList.remove('hidden');
+  requestAnimationFrame(updatePickerUI);
+}
+
+function updatePickerUI(updateInput = true) {
+  const rgbBase = hsvToRgb(pickerH, 1, 1);
+  pickerSatBg.style.backgroundColor = `rgb(${rgbBase.r}, ${rgbBase.g}, ${rgbBase.b})`;
+  const satRect = pickerSatBox.getBoundingClientRect();
+  const pointerX = pickerS * (satRect.width || 260);
+  const pointerY = (1 - pickerV) * (satRect.height || 240);
+  pickerSatPointer.style.left = `${pointerX}px`;
+  pickerSatPointer.style.top = `${pointerY}px`;
+  const hueRect = pickerHueBar.getBoundingClientRect();
+  const hueX = (pickerH / 360) * (hueRect.width || 260);
+  pickerHueThumb.style.left = `${hueX}px`;
+  pickerHueThumb.style.backgroundColor = `rgb(${rgbBase.r}, ${rgbBase.g}, ${rgbBase.b})`;
+  const finalRgb = hsvToRgb(pickerH, pickerS, pickerV);
+  const hex = rgbToHex(finalRgb.r, finalRgb.g, finalRgb.b);
+  if (updateInput) pickerHexInput.value = hex;
+}
+
+let isSatDragging = false;
+function handleSatPointer(e) {
+  const rect = pickerSatBox.getBoundingClientRect();
+  let x = e.clientX - rect.left;
+  let y = e.clientY - rect.top;
+  x = Math.max(0, Math.min(x, rect.width));
+  y = Math.max(0, Math.min(y, rect.height));
+  pickerS = x / rect.width;
+  pickerV = 1 - (y / rect.height);
+  updatePickerUI();
+}
+
+pickerSatBox.addEventListener('pointerdown', (e) => {
+  isSatDragging = true;
+  pickerSatBox.setPointerCapture(e.pointerId);
+  handleSatPointer(e);
+});
+pickerSatBox.addEventListener('pointermove', (e) => { if (isSatDragging) handleSatPointer(e); });
+pickerSatBox.addEventListener('pointerup', () => { isSatDragging = false; });
+
+let isHueDragging = false;
+function handleHuePointer(e) {
+  const rect = pickerHueBar.getBoundingClientRect();
+  let x = e.clientX - rect.left;
+  x = Math.max(0, Math.min(x, rect.width));
+  pickerH = (x / rect.width) * 360;
+  if (pickerH >= 360) pickerH = 359.9;
+  updatePickerUI();
+}
+
+pickerHueBar.addEventListener('pointerdown', (e) => {
+  isHueDragging = true;
+  pickerHueBar.setPointerCapture(e.pointerId);
+  handleHuePointer(e);
+});
+pickerHueBar.addEventListener('pointermove', (e) => { if (isHueDragging) handleHuePointer(e); });
+pickerHueBar.addEventListener('pointerup', () => { isHueDragging = false; });
+
+pickerHexInput.addEventListener('input', (e) => {
+  let val = e.target.value.trim();
+  if (!val.startsWith('#')) val = '#' + val;
+  if (/^#([0-9A-F]{3}){1,2}$/i.test(val)) {
+    const hsv = hexToHsv(val);
+    pickerH = hsv.h;
+    pickerS = hsv.s;
+    pickerV = hsv.v;
+    updatePickerUI(false);
+  }
+});
+
+btnSelectColor.addEventListener('click', () => {
+  const finalRgb = hsvToRgb(pickerH, pickerS, pickerV);
+  const hex = rgbToHex(finalRgb.r, finalRgb.g, finalRgb.b);
+  if (currentPickerCallback) currentPickerCallback(hex);
+  customColorPickerModal.classList.add('hidden');
+});
+
+// ==================== TRIGGER DE CORES ====================
+document.getElementById('btnTriggerColorCreate').addEventListener('click', () => {
+  openCustomColorPicker(selectedBannerColor, (hex) => {
+    selectedBannerColor = hex;
+    document.getElementById('previewColorCreate').style.backgroundColor = hex;
+    document.getElementById('txtColorCreate').textContent = hex;
+  });
+});
+
+document.getElementById('btnTriggerColorEdit').addEventListener('click', () => {
+  openCustomColorPicker(editSelectedBannerColor, (hex) => {
+    editSelectedBannerColor = hex;
+    document.getElementById('previewColorEdit').style.backgroundColor = hex;
+    document.getElementById('txtColorEdit').textContent = hex;
+  });
+});
+
+document.getElementById('btnTriggerColorRole').addEventListener('click', () => {
+  openCustomColorPicker(roleSelectedColor, (hex) => {
+    roleSelectedColor = hex;
+    previewColorRole.style.backgroundColor = hex;
+    txtColorRole.textContent = hex;
+  });
+});
+
+// ==================== LOJA BOTÃO ====================
+btnOpenStore.addEventListener('click', (e) => {
+  e.stopPropagation();
+  storeModal.classList.remove('hidden');
+  carregarLoja();
+});
+btnCloseStoreModal.addEventListener('click', () => { storeModal.classList.add('hidden'); });
+
+// ==================== BACK BUTTON ====================
+btnBack.addEventListener('click', () => {
+  appScreen.classList.remove('chat-open');
+  targetUsername = null;
+  currentServerId = null;
+  activeServerData = null;
+  btnServerHeaderInfo.classList.add('hidden');
+  if (typingListenersUnsubscribe) {
+    typingListenersUnsubscribe();
+    typingListenersUnsubscribe = null;
+  }
+  typingIndicatorText.textContent = '';
+});
+
+// ==================== SERVER INFO BOTÕES ====================
+btnCloseServerInfoModal.addEventListener('click', () => { serverInfoModal.classList.add('hidden'); });
+btnModalCopyLink.addEventListener('click', () => {
+  navigator.clipboard.writeText(modalServerInviteLink.textContent);
+  showToast('Link copiado!', 'success');
+});
+
+btnOpenInviteMore.addEventListener('click', () => {
+  serverInfoModal.classList.add('hidden');
+  newlyCreatedInviteCode = activeServerData.inviteCode;
+  newlyCreatedServerId = currentServerId;
+  abrirModalConvidarAmigos(currentServerId, activeServerData.inviteCode);
+});
+
+btnSaveServerEdit.addEventListener('click', async () => {
+  const newName = editServerNameInput.value.trim() || activeServerData.name;
+  const newDesc = editServerDescInput.value.trim();
+  try {
+    await updateDoc(doc(db, "servers", currentServerId), {
+      name: newName,
+      description: newDesc,
+      bannerColor: editSelectedBannerColor
+    });
+    showToast('Servidor atualizado!', 'success');
+    serverInfoModal.classList.add('hidden');
+    abrirServidorChat(currentServerId);
+  } catch (err) {
+    showToast('Erro ao atualizar servidor.');
+  }
+});
+
+btnLeaveOrDeleteServer.addEventListener('click', async () => {
+  const isOwner = activeServerData.owner === currentUsername;
+  if (isOwner) {
+    if (confirm('Excluir permanentemente este servidor?')) {
+      await deleteDoc(doc(db, "servers", currentServerId));
+      serverInfoModal.classList.add('hidden');
+      appScreen.classList.remove('chat-open');
+      currentServerId = null;
+      showToast('Servidor excluído.');
+    }
+  } else {
+    if (confirm('Sair deste servidor?')) {
+      await updateDoc(doc(db, "servers", currentServerId), { members: arrayRemove(currentUsername) });
+      await deleteDoc(doc(db, "servers", currentServerId, "members", currentUsername));
+      serverInfoModal.classList.add('hidden');
+      appScreen.classList.remove('chat-open');
+      currentServerId = null;
+      showToast('Você saiu do servidor.');
+    }
+  }
+});
+
+// ==================== INICIALIZAÇÃO ====================
 setupTypingSystem();
+carregarLoja();
+
+console.log('🔥 Starcord inicializado com sucesso!');
