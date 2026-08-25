@@ -1,7 +1,7 @@
 {
   "name": "meu-site-app",
   "version": "1.0.0",
-  "description": "Meu site em APK",
+  "description": "Criado por Eduh",
   "main": "index.html",
   "scripts": {
     "build": "echo 'Build concluído'"
