@@ -65,7 +65,6 @@
           </div>
         </div>
         <div style="display: flex; gap: 4px; align-items: center;">
-          <!-- Saldo de Moedas -->
           <div class="coins-display" id="coinsDisplay">
             <span class="coin-icon">⭐</span>
             <span id="coinsValue">0</span>
@@ -115,14 +114,17 @@
             <div class="user-details">
               <h3 id="chatTargetTitle">@amigo</h3>
               <span class="user-handle" id="chatTargetHandle">Clique para ver o perfil</span>
-              <!-- Indicador de digitação -->
-              <span class="typing-indicator" id="typingIndicator" style="display:none; font-size:11px; color:var(--accent-red);">...</span>
             </div>
           </div>
         </div>
-        <button class="btn btn-secondary btn-icon hidden" id="btnServerHeaderInfo" title="Configurações e Convites">
+        <button class="btn btn-secondary btn-icon" id="btnServerHeaderInfo" title="Configurações e Convites">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
         </button>
+      </div>
+
+      <!-- Indicador de digitação agora fica acima do input -->
+      <div class="typing-indicator-area" id="typingIndicatorArea">
+        <span class="typing-indicator-text" id="typingIndicatorText"></span>
       </div>
 
       <div class="chat-messages" id="chatMessages"></div>
@@ -177,13 +179,29 @@
           <textarea id="editBio" placeholder="Escreva algo sobre você..."></textarea>
           <div class="field-value hidden" id="viewBio"></div>
         </div>
+
+        <!-- Cargos do usuário (apenas visualização) -->
+        <div class="profile-card-section" id="userRolesSection" style="display:none;">
+          <div class="field-label">Cargos</div>
+          <div id="userRolesList"></div>
+        </div>
+
+        <!-- Ações de moderação -->
+        <div class="profile-card-section" id="moderationActions" style="display:none;">
+          <div class="field-label">Moderação</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="btnKickUser" style="background:#ff6b35;">Expulsar</button>
+            <button class="btn" id="btnBanUser" style="background:#ff1744;">Banir</button>
+            <button class="btn" id="btnAssignRole" style="background:#2979ff;">Dar Cargo</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal da Loja de Banners (Com suporte a Links e GIFs animados) -->
+  <!-- Modal da Loja de Banners -->
   <div id="storeModal" class="modal-overlay hidden">
-    <div class="profile-modal" style="max-width: 400px;">
+    <div class="profile-modal" style="max-width: 450px;">
       <div class="modal-top-bar">
         <button class="btn btn-secondary btn-icon" id="btnCloseStoreModal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -191,59 +209,15 @@
         <h3>⭐ Nossa Loja</h3>
         <div></div>
       </div>
-      <div class="server-create-body" style="gap: 12px;">
-        <p style="color: var(--text-muted); font-size: 13px; text-align: center;">Escolha um banner pronto ou insira o link direto de um GIF/Imagem!</p>
+      <div class="server-create-body" style="gap: 12px; padding: 16px;">
+        <p style="color: var(--text-muted); font-size: 13px; text-align: center;">Adquira banners incríveis com suas moedas!</p>
         
-        <!-- Campo para Banner por Link / GIF -->
-        <div class="input-group" style="width: 100%;">
-          <div class="field-label">Banner por Link (GIF ou Imagem)</div>
-          <div style="display: flex; gap: 6px;">
-            <input type="text" id="customBannerUrlInput" placeholder="https://exemplo.com/banner.gif" autocomplete="off" />
-            <button class="btn" style="padding: 0 14px; font-size: 11px;" onclick="window.aplicarBannerCustomizadoPorLink()">Usar</button>
-          </div>
+        <div style="display:flex; gap:8px; align-items:center; background:var(--bg-card); padding:8px 14px; border-radius:10px; width:100%;">
+          <span style="font-size:13px;">💰 Seu saldo:</span>
+          <span style="font-weight:700; color:var(--accent-red);" id="storeCoinsBalance">0</span>
         </div>
 
-        <div style="width: 100%; height: 1px; background: var(--border-color); margin: 4px 0;"></div>
-
-        <!-- Banner 1 - Floresta Vermelha -->
-        <div class="store-banner-option" data-banner="https://cdn.discordapp.com/attachments/1462160007893356677/1541238475582345348/dee986b92033c942037f1772a6ff6df5.gif?ex=6a8ed7ef&is=6a8d866f&hm=0e2f70957e8ba5a22cac34df24c457403ec55344fb5ddb2b4cfb4c2be56059fc&">
-          <div class="store-banner-preview" style="background-image: url('https://cdn.discordapp.com/attachments/1462160007893356677/1541238475582345348/dee986b92033c942037f1772a6ff6df5.gif?ex=6a8ed7ef&is=6a8d866f&hm=0e2f70957e8ba5a22cac34df24c457403ec55344fb5ddb2b4cfb4c2be56059fc&');"></div>
-          <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Floresta Vermelha</span>
-            <span style="font-size: 11px; color: #23c268;">Grátis</span>
-          </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('https://cdn.discordapp.com/attachments/1462160007893356677/1541238475582345348/dee986b92033c942037f1772a6ff6df5.gif?ex=6a8ed7ef&is=6a8d866f&hm=0e2f70957e8ba5a22cac34df24c457403ec55344fb5ddb2b4cfb4c2be56059fc&')">Usar</button>
-        </div>
-
-        <!-- Banner 2 - Floresta Verde -->
-        <div class="store-banner-option" data-banner="https://cdn.discordapp.com/attachments/1462160007893356677/1541239154334113902/409da4dc00fca0b271407d734c59ea7f.gif?ex=6a8ed891&is=6a8d8711&hm=92a8497443652690e52270a1cc60bdc69d6bc5fbe2ea0ce5ba14da479ef0009c&">
-          <div class="store-banner-preview" style="background-image: url('https://cdn.discordapp.com/attachments/1462160007893356677/1541239154334113902/409da4dc00fca0b271407d734c59ea7f.gif?ex=6a8ed891&is=6a8d8711&hm=92a8497443652690e52270a1cc60bdc69d6bc5fbe2ea0ce5ba14da479ef0009c&');"></div>
-          <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Floresta Verde</span>
-            <span style="font-size: 11px; color: #23c268;">Grátis</span>
-          </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('https://cdn.discordapp.com/attachments/1462160007893356677/1541239154334113902/409da4dc00fca0b271407d734c59ea7f.gif?ex=6a8ed891&is=6a8d8711&hm=92a8497443652690e52270a1cc60bdc69d6bc5fbe2ea0ce5ba14da479ef0009c&')">Usar</button>
-        </div>
-
-        <!-- Banner 3 - Garota Anime -->
-        <div class="store-banner-option" data-banner="https://cdn.discordapp.com/attachments/1462160007893356677/1541239160445075508/c11cfeda5da203e1ac5038dc08c8e617.jpg?ex=6a8ed892&is=6a8d8712&hm=16961bbaaa1f6ab7d130df7258627e7e8e0d1b27f38338e595e5af4b314bbf8f&">
-          <div class="store-banner-preview" style="background-image: url('https://cdn.discordapp.com/attachments/1462160007893356677/1541239160445075508/c11cfeda5da203e1ac5038dc08c8e617.jpg?ex=6a8ed892&is=6a8d8712&hm=16961bbaaa1f6ab7d130df7258627e7e8e0d1b27f38338e595e5af4b314bbf8f&');"></div>
-          <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Garota Anime</span>
-            <span style="font-size: 11px; color: #23c268;">Grátis</span>
-          </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('https://cdn.discordapp.com/attachments/1462160007893356677/1541239160445075508/c11cfeda5da203e1ac5038dc08c8e617.jpg?ex=6a8ed892&is=6a8d8712&hm=16961bbaaa1f6ab7d130df7258627e7e8e0d1b27f38338e595e5af4b314bbf8f&')">Usar</button>
-        </div>
-
-        <!-- Banner 4 - Garota Anime 2 -->
-        <div class="store-banner-option" data-banner="https://cdn.discordapp.com/attachments/1462160007893356677/1541239169848844339/8f7a17a41f56dcfd339f0ad4a473ab36.jpg?ex=6a8ed894&is=6a8d8714&hm=8958a8dfcdd5f24da59c30f04975ee7ea7664359c305dde0b45e0cb69ca96d67&">
-          <div class="store-banner-preview" style="background-image: url('https://cdn.discordapp.com/attachments/1462160007893356677/1541239169848844339/8f7a17a41f56dcfd339f0ad4a473ab36.jpg?ex=6a8ed894&is=6a8d8714&hm=8958a8dfcdd5f24da59c30f04975ee7ea7664359c305dde0b45e0cb69ca96d67&');"></div>
-          <div class="store-banner-info">
-            <span style="font-weight: 700; font-size: 13px;">Garota Anime 2</span>
-            <span style="font-size: 11px; color: #23c268;">Grátis</span>
-          </div>
-          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="window.setBannerChoice('https://cdn.discordapp.com/attachments/1462160007893356677/1541239169848844339/8f7a17a41f56dcfd339f0ad4a473ab36.jpg?ex=6a8ed894&is=6a8d8714&hm=8958a8dfcdd5f24da59c30f04975ee7ea7664359c305dde0b45e0cb69ca96d67&')">Usar</button>
-        </div>
+        <div id="storeItemsContainer" style="width:100%; display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto; padding-right:4px;"></div>
       </div>
     </div>
   </div>
@@ -315,7 +289,7 @@
 
   <!-- Modal de Informações / Gerenciamento do Servidor -->
   <div id="serverInfoModal" class="modal-overlay hidden">
-    <div class="profile-modal">
+    <div class="profile-modal" style="max-width:500px;">
       <div class="modal-top-bar">
         <button class="btn btn-secondary btn-icon" id="btnCloseServerInfoModal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -356,6 +330,16 @@
           <textarea id="editServerDescInput" class="hidden" placeholder="Descrição do servidor..."></textarea>
         </div>
 
+        <!-- Cargos do Servidor -->
+        <div class="profile-card-section" id="rolesSection">
+          <div class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Cargos</span>
+            <button class="btn" id="btnCreateRole" style="padding:4px 12px; font-size:11px;">+ Criar</button>
+          </div>
+          <div id="serverRolesList" style="display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
+        </div>
+
+        <!-- Membros -->
         <div class="profile-card-section" id="serverMembersSection">
           <div class="field-label">Membros</div>
           <div id="serverMembersListContainer" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;"></div>
@@ -365,6 +349,101 @@
           <button class="btn btn-secondary" id="btnOpenInviteMore" style="flex: 1;">Convidar Amigos</button>
           <button class="btn" id="btnLeaveOrDeleteServer" style="background: #ff4d4d; flex: 1;">Sair do Servidor</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Criação/Edição de Cargo -->
+  <div id="roleModal" class="modal-overlay hidden">
+    <div class="profile-modal" style="max-width:420px;">
+      <div class="modal-top-bar">
+        <button class="btn btn-secondary btn-icon" id="btnCloseRoleModal">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <h3 id="roleModalTitle">Criar Cargo</h3>
+        <button class="btn" id="btnSaveRole">Salvar</button>
+      </div>
+      <div class="server-create-body" style="padding:20px;">
+        <div class="input-group" style="width:100%;">
+          <div class="field-label">Nome do Cargo</div>
+          <input type="text" id="inputRoleName" placeholder="Ex: Moderador" />
+        </div>
+
+        <div class="input-group" style="width:100%;">
+          <div class="field-label">Cor do Cargo</div>
+          <div class="color-picker-trigger-box" id="btnTriggerColorRole">
+            <div class="color-preview-swatch" id="previewColorRole" style="background: #ffffff;"></div>
+            <span id="txtColorRole" style="font-family: monospace; font-weight: 600; font-size: 13px;">#ffffff</span>
+            <span style="font-size: 11px; color: var(--accent-red); margin-left: auto; font-weight: 700;">SELECIONAR COR</span>
+          </div>
+        </div>
+
+        <div class="input-group" style="width:100%;">
+          <div class="field-label">Permissões</div>
+          <div style="display:flex; flex-direction:column; gap:8px; background:var(--bg-card); padding:12px; border-radius:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:13px;">Enviar Mensagem</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="permSendMessage" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:13px;">Mencionar Cargos</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="permMentionRoles" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:13px;">Editor de Textos (##, ###)</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="permTextEditor" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:13px;">Gerenciar Cargos</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="permManageRoles" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:13px;">Expulsar Membros</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="permKick" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:13px;">Banir Membros</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="permBan" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn" id="btnDeleteRole" style="background:#ff1744; width:100%; display:none;">Excluir Cargo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Atribuir Cargo -->
+  <div id="assignRoleModal" class="modal-overlay hidden">
+    <div class="profile-modal" style="max-width:380px;">
+      <div class="modal-top-bar">
+        <button class="btn btn-secondary btn-icon" id="btnCloseAssignRoleModal">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <h3>Atribuir Cargo</h3>
+        <div></div>
+      </div>
+      <div class="server-create-body" style="padding:20px;">
+        <p style="color:var(--text-muted); font-size:13px; text-align:center;">Selecione um cargo para atribuir ao usuário.</p>
+        <div id="assignRoleList" style="width:100%; display:flex; flex-direction:column; gap:6px;"></div>
       </div>
     </div>
   </div>
