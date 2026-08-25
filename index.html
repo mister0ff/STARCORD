@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR"> 
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -26,7 +26,7 @@
       </div>
       <h2 id="authTitle">Criar Conta</h2>
       <p id="authSub">Preencha os dados abaixo</p>
-
+      
       <div class="input-group" id="groupUsername">
         <div class="username-input-wrapper">
           <span class="username-prefix">@</span>
@@ -45,10 +45,10 @@
       <div class="input-group" id="groupConfirmPassword">
         <input type="password" id="authConfirmPassword" placeholder="Confirme sua senha" />
       </div>
-
+      
       <button class="btn" id="btnAuthSubmit">Cadastrar</button>
       <button class="btn btn-secondary" id="btnToggleAuthMode">Já tenho conta!</button>
-
+      
       <div id="authError" class="error-msg"></div>
     </div>
   </div>
@@ -181,7 +181,7 @@
       </div>
       <div class="server-create-body">
         <p style="color: var(--text-muted); font-size: 13px; text-align: center;">Seu servidor é onde você e seus amigos se reúnem. Crie o seu e comece a interagir.</p>
-
+        
         <label class="server-icon-picker" id="serverIconPickerLabel">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           <span>ENVIAR</span>
@@ -198,7 +198,6 @@
           <textarea id="inputServerDesc" placeholder="Sobre o que é este servidor?"></textarea>
         </div>
 
-        <!-- Seletor de Cor do Banner -->
         <div class="input-group" style="width: 100%;">
           <div class="field-label">Cor do Banner</div>
           <div class="color-picker-trigger-box" id="btnTriggerColorCreate">
@@ -223,7 +222,7 @@
       </div>
       <div class="server-create-body">
         <p style="color: var(--text-muted); font-size: 13px; text-align: center;">Você vai precisar de alguns amigos para aproveitar ao máximo o seu servidor.</p>
-
+        
         <div class="invite-link-box">
           <span id="txtInviteLink" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">starcord.gg/xyz</span>
           <button class="btn" id="btnCopyInviteLink" style="padding: 6px 12px; font-size: 11px;">Copiar link</button>
@@ -255,7 +254,6 @@
           </div>
         </div>
 
-        <!-- Configuração da Cor do Banner pelo Dono -->
         <div class="profile-card-section hidden" id="editBannerColorSection">
           <div class="field-label">Cor do Banner do Servidor</div>
           <div class="color-picker-trigger-box" id="btnTriggerColorEdit">
@@ -319,7 +317,7 @@
   <div id="cropModal" class="modal-overlay hidden">
     <div class="crop-modal-content">
       <div style="font-size: 14px; font-weight: 700; width: 100%; text-align: center;">Editar imagem</div>
-
+      
       <div class="crop-viewport-container" id="cropContainer">
         <canvas id="cropCanvas" width="260" height="260"></canvas>
         <div class="crop-grid-overlay">
@@ -344,7 +342,6 @@
     </div>
   </div>
 
-  <!-- Módulo de entrada da aplicação -->
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
