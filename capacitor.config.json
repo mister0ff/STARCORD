@@ -1,6 +1,6 @@
 {
   "appId": "com.exemplo.meusite",
-  "appName": "Meu Site App",
+  "appName": "StarCord",
   "webDir": "www",
   "bundledWebRuntime": false
 }
